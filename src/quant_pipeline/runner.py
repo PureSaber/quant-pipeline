@@ -62,6 +62,7 @@ def run_step(name: str, command: str, *, cwd: Path | None = None, env: dict[str,
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
     return StepResult(
         name=name,
