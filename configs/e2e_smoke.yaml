@@ -1,4 +1,4 @@
-name: daily_paper
+name: e2e_smoke
 workspace: ../../quant-workspace/configs/default.workspace.yaml
 
 steps:
@@ -13,11 +13,3 @@ steps:
   - name: risk_check
     cwd: "{QW_QUANT_RISK_MONITOR_REPO}"
     cmd: quant-risk check --config configs/paper_smoke.yaml --out state/alerts.json
-
-  - name: lab_scan
-    cwd: "{QW_QUANT_LAB_REPO}"
-    cmd: quant-lab scan --workspace configs/default.yaml
-
-  - name: lab_export_html
-    cwd: "{QW_QUANT_LAB_REPO}"
-    cmd: quant-lab export html --out reports/dashboard.html
