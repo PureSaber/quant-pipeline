@@ -1,0 +1,23 @@
+name: daily_paper
+workspace: ../../quant-workspace/configs/default.workspace.yaml
+
+steps:
+  - name: regime_detect
+    cwd: "{QW_QUANT_REGIME_REPO}"
+    cmd: quant-regime detect --config configs/default.yaml --out state/regime.json
+
+  - name: paper_step
+    cwd: "{QW_QUANT_PAPER_SIM_REPO}"
+    cmd: quant-paper step --config configs/default.yaml
+
+  - name: risk_check
+    cwd: "{QW_QUANT_RISK_MONITOR_REPO}"
+    cmd: quant-risk check --config configs/paper_smoke.yaml --out state/alerts.json
+
+  - name: lab_scan
+    cwd: "{QW_QUANT_LAB_REPO}"
+    cmd: quant-lab scan --workspace configs/default.yaml
+
+  - name: lab_export_html
+    cwd: "{QW_QUANT_LAB_REPO}"
+    cmd: quant-lab export html --out reports/dashboard.html
