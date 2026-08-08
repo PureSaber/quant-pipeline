@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "quant-pipeline config",
+  "type": "object",
+  "required": ["steps"],
+  "properties": {
+    "name": { "type": "string" },
+    "workspace": { "type": "string" },
+    "cwd": { "type": "string" },
+    "run_id": { "type": "string" },
+    "error_log_dir": { "type": "string" },
+    "env": { "type": "object" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["cmd"],
+        "properties": {
+          "name": { "type": "string" },
+          "cmd": { "type": ["string", "array"] },
+          "cwd": { "type": "string" },
+          "shell": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

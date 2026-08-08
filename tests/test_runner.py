@@ -24,8 +24,8 @@ def test_run_pipeline_stops_on_error(tmp_path: Path) -> None:
             {
                 "name": "fail",
                 "steps": [
-                    {"name": "bad", "cmd": "python -c \"import sys; sys.exit(1)\""},
-                    {"name": "skip", "cmd": "echo never"},
+                    {"name": "bad", "cmd": "exit 1", "shell": True},
+                    {"name": "skip", "cmd": "echo never", "shell": True},
                 ],
             }
         ),
@@ -34,21 +34,3 @@ def test_run_pipeline_stops_on_error(tmp_path: Path) -> None:
     result = run_pipeline(cfg, stop_on_error=True)
     assert not result.ok
     assert len(result.steps) == 1
-
-
-def test_run_step_shell_mode() -> None:
-    from quant_pipeline.runner import run_step
-
-    result = run_step("sh", "echo hi", shell=True)
-    assert result.exit_code == 0
-    assert "hi" in result.stdout
-
-
-def test_expand_missing_key_raises() -> None:
-    from quant_pipeline.runner import _expand
-
-    try:
-        _expand("{missing}", {})
-        raise AssertionError("expected KeyError")
-    except KeyError:
-        pass

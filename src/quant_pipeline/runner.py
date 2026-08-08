@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import subprocess
@@ -9,6 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from quant_pipeline.logging_util import write_step_failure_log
+
+logger = logging.getLogger(__name__)
 
 _LOG_TAIL = 4000
 
@@ -33,8 +38,18 @@ class PipelineResult:
         return all(s.exit_code == 0 for s in self.steps)
 
 
-def _expand(text: str, env: dict[str, str]) -> str:
-    return os.path.expandvars(text.format(**env))
+class PipelineExpandError(KeyError):
+    """Raised when a template key is missing during step expansion."""
+
+
+def _expand(text: str, env: dict[str, str], *, step_name: str = "step") -> str:
+    try:
+        return os.path.expandvars(text.format(**env))
+    except KeyError as exc:
+        missing = exc.args[0]
+        raise PipelineExpandError(
+            f"Step {step_name!r}: missing template key {missing!r} in {text!r}"
+        ) from exc
 
 
 def _build_env(workspace_config: Path | None, extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -47,7 +62,7 @@ def _build_env(workspace_config: Path | None, extra: dict[str, str] | None = Non
         except ImportError as exc:
             raise ImportError(
                 "quant-workspace is required when pipeline config sets `workspace`. "
-                "Install with: pip install quant-pipeline[workspace]"
+                "Install with: pip install 'quant-pipeline[workspace]'"
             ) from exc
 
         ws = load_workspace(workspace_config, root_override=env.get("QUANT_WORKSPACE_ROOT"))
@@ -62,12 +77,18 @@ def _build_env(workspace_config: Path | None, extra: dict[str, str] | None = Non
     return env
 
 
-def _command_argv(command: str, shell: bool) -> tuple[list[str], bool]:
-    if shell:
-        return [command], True
-    if os.name == "nt":
-        return ["cmd.exe", "/c", command], False
-    return shlex.split(command, posix=True), False
+def _resolve_argv(raw_step: dict[str, Any], command: str) -> tuple[list[str] | str, bool]:
+    """Return subprocess argv. Shell mode is opt-in per step via shell: true."""
+    cmd_raw = raw_step.get("cmd", command)
+    use_shell = bool(raw_step.get("shell", False))
+
+    if isinstance(cmd_raw, list):
+        return [str(part) for part in cmd_raw], False
+
+    if use_shell:
+        return command, True
+
+    return shlex.split(command, posix=(os.name != "nt")), False
 
 
 def run_step(
@@ -76,13 +97,13 @@ def run_step(
     *,
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
-    shell: bool = False,
-    log_dir: Path | None = None,
+    raw_step: dict[str, Any] | None = None,
 ) -> StepResult:
+    raw_step = raw_step or {"cmd": command}
+    argv, use_shell = _resolve_argv(raw_step, command)
     start = time.perf_counter()
-    argv, use_shell = _command_argv(command, shell)
     proc = subprocess.run(
-        argv[0] if use_shell else argv,
+        argv,
         shell=use_shell,
         cwd=str(cwd) if cwd else None,
         env=env,
@@ -90,22 +111,14 @@ def run_step(
         text=True,
         check=False,
     )
-    result = StepResult(
+    return StepResult(
         name=name,
-        command=command,
+        command=command if isinstance(argv, str) else " ".join(argv),
         exit_code=proc.returncode,
         duration_s=round(time.perf_counter() - start, 3),
         stdout=proc.stdout[-_LOG_TAIL:],
         stderr=proc.stderr[-_LOG_TAIL:],
     )
-    if proc.returncode != 0 and log_dir is not None:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"{name}_error.log"
-        log_path.write_text(
-            f"command: {command}\nexit_code: {proc.returncode}\n\n--- stdout ---\n{proc.stdout}\n\n--- stderr ---\n{proc.stderr}",
-            encoding="utf-8",
-        )
-    return result
 
 
 def run_pipeline(config_path: Path, *, dry_run: bool = False, stop_on_error: bool = True) -> PipelineResult:
@@ -118,34 +131,38 @@ def run_pipeline(config_path: Path, *, dry_run: bool = False, stop_on_error: boo
 
     env = _build_env(ws_path, cfg.get("env"))
     cwd_raw = cfg.get("cwd")
-    cwd = Path(_expand(str(cwd_raw), env)).resolve() if cwd_raw else None
+    cwd = Path(_expand(str(cwd_raw), env, step_name="pipeline.cwd")).resolve() if cwd_raw else None
 
-    log_dir_raw = cfg.get("error_log_dir")
-    log_dir = None
-    if log_dir_raw:
-        log_dir = Path(_expand(str(log_dir_raw), env)).resolve()
+    error_log_dir = cfg.get("error_log_dir")
+    run_id = str(cfg.get("run_id") or name)
 
     result = PipelineResult(name=name)
     for raw_step in cfg.get("steps") or []:
         step_name = str(raw_step.get("name", "step"))
-        command = _expand(str(raw_step["cmd"]), env)
-        step_shell = bool(raw_step.get("shell", False))
+        command = _expand(str(raw_step["cmd"]), env, step_name=step_name)
         if dry_run:
             result.steps.append(StepResult(name=step_name, command=command, exit_code=0, duration_s=0.0))
             continue
         step_cwd = cwd
         if raw_step.get("cwd"):
-            step_cwd = Path(_expand(str(raw_step["cwd"]), env)).resolve()
+            step_cwd = Path(_expand(str(raw_step["cwd"]), env, step_name=step_name)).resolve()
         step_result = run_step(
             step_name,
             command,
             cwd=step_cwd,
             env=env,
-            shell=step_shell,
-            log_dir=log_dir,
+            raw_step=raw_step,
         )
         result.steps.append(step_result)
         if stop_on_error and step_result.exit_code != 0:
+            if error_log_dir:
+                log_root = Path(_expand(str(error_log_dir), env, step_name=step_name))
+                write_step_failure_log(
+                    log_root,
+                    run_id=run_id,
+                    step_id=step_name,
+                    result=step_result,
+                )
             break
     return result
 

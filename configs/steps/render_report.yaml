@@ -1,0 +1,8 @@
+name: render_report
+workspace: ../../quant-workspace/configs/default.workspace.yaml
+error_log_dir: state/pipeline_logs
+
+steps:
+  - name: report_hub_smoke
+    cwd: "{QW_QUANT_REPORT_HUB_REPO}"
+    cmd: python -m pytest tests/test_spread_parity.py -q
