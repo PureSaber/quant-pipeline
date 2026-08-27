@@ -17,3 +17,9 @@ def test_validate_equity_postrun_smoke_config() -> None:
     cfg_path = Path(__file__).resolve().parents[1] / "configs" / "equity_postrun_smoke.yaml"
     issues = validate_config_file(cfg_path, strict=False)
     assert not any(i.startswith("steps") and "missing" in i for i in issues)
+
+
+def test_validate_research_integrity_postrun_config() -> None:
+    cfg_path = Path(__file__).resolve().parents[1] / "configs" / "research_integrity_postrun.yaml"
+    issues = validate_config_file(cfg_path, strict=True)
+    assert issues == []
