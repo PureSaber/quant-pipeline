@@ -44,7 +44,7 @@ class PipelineExpandError(KeyError):
 
 def _expand(text: str, env: dict[str, str], *, step_name: str = "step") -> str:
     try:
-        return os.path.expandvars(text.format(**env))
+        return os.path.expandvars(text).format(**env)
     except KeyError as exc:
         missing = exc.args[0]
         raise PipelineExpandError(
@@ -130,12 +130,12 @@ def run_pipeline(config_path: Path, *, dry_run: bool = False, stop_on_error: boo
         ws_path = (config_path.parent / ws_path).resolve()
 
     env = _build_env(ws_path, cfg.get("env"))
+    run_id = _expand(str(cfg.get("run_id") or name), env, step_name="pipeline.run_id")
+    env["QUANT_PIPELINE_RUN_ID"] = run_id
     cwd_raw = cfg.get("cwd")
     cwd = Path(_expand(str(cwd_raw), env, step_name="pipeline.cwd")).resolve() if cwd_raw else None
 
     error_log_dir = cfg.get("error_log_dir")
-    run_id = str(cfg.get("run_id") or name)
-
     result = PipelineResult(name=name)
     for raw_step in cfg.get("steps") or []:
         step_name = str(raw_step.get("name", "step"))
