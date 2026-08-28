@@ -14,7 +14,9 @@ def test_pipeline_with_workspace_env(tmp_path: Path) -> None:
 
     ws_cfg = tmp_path / "workspace.yaml"
     ws_cfg.write_text(
-        yaml.safe_dump({"root": str(root), "projects": {"alpha": {"repo": "alpha", "outputs": "outputs"}}}),
+        yaml.safe_dump(
+            {"root": str(root), "projects": {"alpha": {"repo": "alpha", "outputs": "outputs"}}}
+        ),
         encoding="utf-8",
     )
 

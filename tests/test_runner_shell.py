@@ -10,7 +10,7 @@ def test_run_step_argv_without_shell(tmp_path: Path) -> None:
     marker = tmp_path / "done.txt"
     result = run_step(
         "write",
-        f'python -c "open(r\'{marker}\', \'w\').close()"',
+        f"python -c \"open(r'{marker}', 'w').close()\"",
         cwd=tmp_path,
         raw_step={"cmd": ["python", "-c", f"open(r'{marker}', 'w').close()"]},
     )

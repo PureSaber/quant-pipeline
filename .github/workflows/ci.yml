@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,11 +19,23 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "git+https://github.com/PureSaber/quant-workspace.git"
-          pip install -e ".[dev]"
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.lock
 
       - name: Ruff check
         run: ruff check src tests
 
-      - name: Pytest
-        run: pytest -q
+      - name: Ruff format
+        run: ruff format --check src tests
+
+      - name: Full branch coverage
+        run: pytest -q --cov=quant_pipeline --cov-branch --cov-report=term-missing --cov-fail-under=80
+
+      - name: V2 core branch coverage
+        run: >-
+          pytest -q tests/test_v2_schema.py tests/test_dag_runner.py tests/test_integrity_checkpoint.py
+          --cov=quant_pipeline.dag_schema
+          --cov=quant_pipeline.dag_runner
+          --cov=quant_pipeline.checkpoint
+          --cov=quant_pipeline.integrity
+          --cov-branch --cov-report=term-missing --cov-fail-under=90
