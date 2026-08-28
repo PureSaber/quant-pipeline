@@ -30,7 +30,9 @@ pyyaml==6.0.3
     # via
     #   quant-pipeline
     #   quant-workspace
-quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@0deb1a30afc8b77c4d8d4b92bb86e44b6acbfefb
+quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.2.0
     # via quant-pipeline
 ruff==0.16.5
     # via quant-pipeline
+tomli==2.2.1 ; python_version < "3.11"
+    # via quant-workspace

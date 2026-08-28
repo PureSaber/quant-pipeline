@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 workspace = [
-    "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@0deb1a30afc8b77c4d8d4b92bb86e44b6acbfefb",
+    "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.2.0",
 ]
 dev = ["pytest>=9.0,<10", "pytest-cov>=7.0,<8", "ruff>=0.16,<0.17"]
 
@@ -41,3 +41,10 @@ source = ["quant_pipeline"]
 fail_under = 80
 show_missing = true
 skip_covered = false
+
+[tool.quant-workspace]
+layer = "orchestration"
+schemas = [
+    { id = "puresaber.pipeline", version = "2.0.0" },
+]
+lock-files = ["requirements-dev.lock"]

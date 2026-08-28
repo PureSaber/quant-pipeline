@@ -69,8 +69,12 @@ jobs:
               summary = entry["summary"]
               covered = summary["covered_branches"]
               total = summary["num_branches"]
-              print(f"{label}: {covered}/{total}={covered / total:.2%}")
-              if total == 0 or covered / total < 0.90:
+              if total == 0:
+                  failures.append(f"{label}: no branches measured")
+                  continue
+              ratio = covered / total
+              print(f"{label}: {covered}/{total}={ratio:.2%}")
+              if ratio < 0.90:
                   failures.append(f"{label}: pure branch gate failed")
           if failures:
               raise SystemExit("; ".join(failures))
