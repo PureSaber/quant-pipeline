@@ -58,7 +58,8 @@ def _artifact(step_id: str, path: str) -> dict:
 
 
 def _runner(**kwargs) -> DagRunner:
-    return DagRunner(stack_manifest=STACK_MANIFEST, seed=7, clock=fixed_clock, **kwargs)
+    kwargs.setdefault("clock", fixed_clock)
+    return DagRunner(stack_manifest=STACK_MANIFEST, seed=7, **kwargs)
 
 
 def test_success_logs_hashes_and_strict_cached_resume(tmp_path: Path) -> None:
@@ -192,6 +193,142 @@ def test_unconfigured_failure_does_not_retry_and_isolates_independent_branch(
         "independent": StepStatus.SUCCEEDED,
     }
     assert len(result.attempts["bad"]) == 1
+
+
+def test_data_quality_failure_blocks_curated_and_strategy_descendants_but_keeps_independent_branch(
+    tmp_path: Path,
+) -> None:
+    config = base_config()
+    config["artifacts"] = [
+        _artifact("data_quality_gate", "artifacts/quality.json"),
+        _artifact("curated_builder", "artifacts/curated.parquet"),
+        _artifact("strategy_research", "artifacts/strategy.json"),
+        _artifact("independent_report", "artifacts/independent.json"),
+    ]
+    config["steps"] = [
+        _step(
+            "data_quality_gate",
+            "artifacts/quality.json",
+            command=[sys.executable, "-c", "raise SystemExit(23)"],
+            retry={"max_attempts": 3, "retry_exit_codes": [75]},
+        ),
+        _step(
+            "curated_builder",
+            "artifacts/curated.parquet",
+            needs=["data_quality_gate"],
+            inputs=["data_quality_gate_output"],
+        ),
+        _step(
+            "strategy_research",
+            "artifacts/strategy.json",
+            needs=["curated_builder"],
+            inputs=["curated_builder_output"],
+        ),
+        _step("independent_report", "artifacts/independent.json"),
+    ]
+
+    result = _runner().run(load_pipeline_spec(write_config(tmp_path, config)), "quality-isolation")
+
+    assert result.step_status == {
+        "data_quality_gate": StepStatus.FAILED,
+        "curated_builder": StepStatus.BLOCKED,
+        "strategy_research": StepStatus.BLOCKED,
+        "independent_report": StepStatus.SUCCEEDED,
+    }
+    assert len(result.attempts["data_quality_gate"]) == 1
+    assert result.attempts["curated_builder"] == ()
+    assert result.attempts["strategy_research"] == ()
+    blocked = {
+        event.step_id: event.details["reason"]
+        for event in result.events
+        if event.event_type == "step_blocked"
+    }
+    assert blocked == {
+        "curated_builder": "dependency_failed",
+        "strategy_research": "dependency_failed",
+    }
+
+
+def test_executor_exception_streams_and_optional_missing_input_are_preserved(
+    tmp_path: Path,
+) -> None:
+    config = base_config()
+    config["artifacts"].insert(
+        0,
+        {
+            "artifact_id": "optional_input",
+            "path": "inputs/optional.txt",
+            "producer": None,
+            "required": False,
+            "immutable": True,
+        },
+    )
+    config["steps"][0]["inputs"] = ["optional_input"]
+
+    class FixtureError(Exception):
+        stdout = b"binary stdout"
+        stderr = "text stderr"
+
+    def executor(step, cwd: Path, env) -> ExecutionOutcome:
+        raise FixtureError("fixture failure")
+
+    spec = load_pipeline_spec(write_config(tmp_path, config))
+    result = _runner(executor=executor).run(spec, "exception-streams")
+
+    assert result.step_status["build"] == StepStatus.FAILED
+    attempt = result.attempts["build"][0]
+    assert attempt.exit_code is None
+    assert (tmp_path / attempt.stdout_log).read_text(encoding="utf-8") == "binary stdout"
+    assert (tmp_path / attempt.stderr_log).read_text(encoding="utf-8") == "text stderr"
+    assert result.artifact_index["optional_input"] == "MISSING"
+
+
+def test_declared_actual_hash_and_existing_run_log_fail_closed(tmp_path: Path) -> None:
+    spec = load_pipeline_spec(write_config(tmp_path, base_config()))
+    output = tmp_path / "artifacts/output.txt"
+    output.parent.mkdir(parents=True)
+    output.write_text("output", encoding="utf-8")
+    artifact = replace(spec.artifacts[0], actual_sha256="0" * 64)
+    with pytest.raises(ArtifactIntegrityError, match="declared actual hash"):
+        _runner()._hash_artifact(spec, artifact)
+
+    log_dir = spec.log_dir / "existing-log"
+    log_dir.mkdir(parents=True)
+    with pytest.raises(CheckpointError, match="Run log directory already exists"):
+        _runner().run(spec, "existing-log")
+
+
+def test_attempt_log_collision_and_exhausted_retry_checkpoint_are_not_silent(
+    tmp_path: Path,
+) -> None:
+    spec = load_pipeline_spec(write_config(tmp_path / "collision", base_config()))
+    created = False
+
+    def clock() -> datetime:
+        nonlocal created
+        if not created:
+            log_dir = spec.log_dir / "log-collision" / "build"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            (log_dir / "attempt-0001.stdout.log").write_text("collision", encoding="utf-8")
+            created = True
+        return fixed_clock()
+
+    result = _runner(clock=clock).run(spec, "log-collision")
+    assert result.step_status["build"] == StepStatus.FAILED
+    assert result.attempts["build"] == ()
+    assert any(event.event_type == "step_contract_failed" for event in result.events)
+
+    failed_root = tmp_path / "exhausted"
+    failed_config = base_config()
+    failed_config["steps"][0]["command"] = [sys.executable, "-c", "raise SystemExit(2)"]
+    failed_spec = load_pipeline_spec(write_config(failed_root, failed_config))
+    _runner().run(failed_spec, "exhausted")
+    checkpoint = load_checkpoint(failed_spec.checkpoint_path)
+    checkpoint.step_status["build"] = StepStatus.PENDING
+    write_checkpoint_atomic(failed_spec.checkpoint_path, checkpoint)
+    resumed = _runner(spec=failed_spec).resume(failed_spec.checkpoint_path)
+    assert resumed.step_status["build"] == StepStatus.FAILED
+    assert any(event.event_type == "step_contract_failed" for event in resumed.events)
 
 
 def test_fail_fast_blocks_independent_branch(tmp_path: Path) -> None:

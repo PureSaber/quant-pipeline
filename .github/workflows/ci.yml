@@ -29,7 +29,9 @@ jobs:
         run: ruff format --check src tests
 
       - name: Full branch coverage
-        run: pytest -q --cov=quant_pipeline --cov-branch --cov-report=term-missing --cov-fail-under=80
+        run: >-
+          pytest -q --cov=quant_pipeline --cov-branch
+          --cov-report=term-missing --cov-report=json:coverage-full.json --cov-fail-under=80
 
       - name: V2 core branch coverage
         run: >-
@@ -38,4 +40,38 @@ jobs:
           --cov=quant_pipeline.dag_runner
           --cov=quant_pipeline.checkpoint
           --cov=quant_pipeline.integrity
-          --cov-branch --cov-report=term-missing --cov-fail-under=90
+          --cov-branch --cov-report=term-missing --cov-report=json:coverage-core.json
+
+      - name: V2 core pure branch gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("coverage-core.json").read_text(encoding="utf-8"))
+          files = {
+              "dag_runner.py": "src/quant_pipeline/dag_runner.py",
+              "dag_schema.py": "src/quant_pipeline/dag_schema.py",
+              "checkpoint.py": "src/quant_pipeline/checkpoint.py",
+              "integrity.py": "src/quant_pipeline/integrity.py",
+          }
+          failures = []
+          for label, expected in files.items():
+              normalized = expected.replace("\\", "/")
+              entry = next(
+                  (value for key, value in report["files"].items()
+                   if key.replace("\\", "/") == normalized),
+                  None,
+              )
+              if entry is None:
+                  failures.append(f"{label}: missing from coverage JSON")
+                  continue
+              summary = entry["summary"]
+              covered = summary["covered_branches"]
+              total = summary["num_branches"]
+              print(f"{label}: {covered}/{total}={covered / total:.2%}")
+              if total == 0 or covered / total < 0.90:
+                  failures.append(f"{label}: pure branch gate failed")
+          if failures:
+              raise SystemExit("; ".join(failures))
+          PY
