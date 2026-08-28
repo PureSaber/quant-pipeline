@@ -5,7 +5,9 @@
 - Baseline: `bbb1bb7cef8b14258b8100fa02dfd19f60a0787b`
 - Platform: Windows, Python 3.12.5
 - Isolated environment: `.venv-m6` installed only from `requirements-dev.lock`
-- Lock SHA-256: `16a09b093a94bcdc86fb4d0fb349148222862d8d780b582671f228676361571a`
+- Lock SHA-256: `589b04612ff97e01a89d5f009906b046c539ea53a155124587f4c48e8e5fd995`
+- Internal dependency: `quant-workspace@v0.2.0`，解引用commit
+  `1a9134ac329704060a3ae96cc81e31db481a938f`；安装日志确认不再读取浮动分支。
 - `pip check`: no broken requirements
 
 ## Commands and results
@@ -51,10 +53,10 @@ Added regression coverage:
 
 ## Evidence hashes
 
-- `pytest-full.xml`: `f7a8d286efb54e624a9edc22e8efa754be9c11ab5a7ea429e0d3e4bf092a44e6`
-- `coverage-full.json`: `08895e401bcf8506223be1ff102448a0116f58d9e4ba0113a15b2ec61d9a9310`
-- `pytest-core.xml`: `4dbe03132d8818767105ff3e7074bba7b030a1ee5ec98cd944a7874d17510615`
-- `coverage-core.json`: `75e11983536e505833e4d6c46c11599483985c60f8e3c2cd097c9cde4429619b`
+- `pytest-full.xml`: `d7abc5834c17206568f57eeb840f949f26cb3f81dbf8239065f3af221690a8a1`
+- `coverage-full.json`: `9b6c486c1e0130b1c76c271ba679c97768f501fd61007cc70c879049f59833a2`
+- `pytest-core.xml`: `731a21921c380b0cb39aa705d1f46a2079476cbdbfbcc3b2f3b906ad2d4427c7`
+- `coverage-core.json`: `0cc0ec8734cf224a6ebb324c323afedcf62427c27b22bdffc1c2171c3b7a22c6`
 
 Python 3.10 and 3.11 were not installed on this workstation. The GitHub Actions matrix is configured
 for Python 3.10, 3.11, and 3.12; those two versions require project-lead push/PR validation.

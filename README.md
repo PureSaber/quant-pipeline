@@ -85,10 +85,9 @@ JSON, self-hashed, fsynced, and atomically replaced after state transitions. Res
 ID, config hash, stack manifest hash, seed, event sequence, attempt logs, idempotency keys, and every
 immutable output hash. Missing or modified inputs, outputs, or logs fail closed.
 
-The v2 implementation consumes a stack manifest as JSON or a mapping and does not import the pending
-`quant-workspace` M6 API. The legacy optional dependency is pinned to full commit
-`0deb1a30afc8b77c4d8d4b92bb86e44b6acbfefb`; the project lead must replace it with the final published
-M6 tag before release.
+The v2 implementation consumes a stack manifest as JSON or a mapping, keeping runtime validation
+decoupled from the producer implementation. The optional workspace integration is pinned to the
+published `quant-workspace v0.2.0` tag; CI installs it only through `requirements-dev.lock`.
 
 This package does not provide distributed scheduling, network execution, credentials, or live order
 submission.
