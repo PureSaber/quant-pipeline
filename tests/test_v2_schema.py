@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,8 @@ def test_repository_v2_smoke_config_validates() -> None:
         (lambda cfg: cfg.update(unexpected=True), "unknown keys"),
         (lambda cfg: cfg["steps"][0].update(shell=True), "forbidden"),
         (lambda cfg: cfg["steps"][0].update(command="echo unsafe"), "must be a list"),
+        (lambda cfg: cfg.update(name=0), "must be a non-empty string"),
+        (lambda cfg: cfg.update(fail_fast="false"), "must be a boolean"),
         (lambda cfg: cfg["artifacts"][0].update(path="../escape.txt"), "escapes"),
         (lambda cfg: cfg["steps"][0].update(cwd="../escape"), "escapes"),
         (lambda cfg: cfg["steps"][0].update(timeout=float("inf")), "must be finite"),
@@ -83,6 +86,12 @@ def test_duplicate_step_and_artifact_ids(tmp_path: Path) -> None:
     config["steps"].append(deepcopy(config["steps"][0]))
     config["artifacts"].append(deepcopy(config["artifacts"][0]))
     assert {"DUPLICATE_STEP", "DUPLICATE_ARTIFACT"} <= _codes(write_config(tmp_path, config))
+
+
+def test_deterministic_topology_rejects_duplicate_step_ids(tmp_path: Path) -> None:
+    spec = load_pipeline_spec(write_config(tmp_path, base_config()))
+    duplicate = replace(spec, steps=(spec.steps[0], spec.steps[0]))
+    assert deterministic_topology(duplicate) == ()
 
 
 def test_empty_dag_and_duplicate_retry_matchers(tmp_path: Path) -> None:
