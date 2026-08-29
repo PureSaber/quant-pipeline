@@ -27,6 +27,7 @@ from quant_pipeline.integrity import (
     stack_manifest_hash,
 )
 from quant_pipeline.v2_models import (
+    NON_RETRYABLE_GATE_KINDS,
     ArtifactIntegrityError,
     ArtifactSpec,
     CheckpointError,
@@ -275,14 +276,19 @@ class DagRunner:
             if exit_code != 0:
                 error_type = "ProcessExit"
                 error_message = f"process exited with code {exit_code}"
-                retryable = exit_code in step.retry.retry_exit_codes
+                retryable = (
+                    step.kind not in NON_RETRYABLE_GATE_KINDS
+                    and exit_code in step.retry.retry_exit_codes
+                )
         except Exception as exc:  # noqa: BLE001 - arbitrary executors are an explicit boundary
             error_type = type(exc).__name__
             error_message = str(exc)
             stdout = _exception_stream(getattr(exc, "stdout", getattr(exc, "output", None)))
             stderr = _exception_stream(getattr(exc, "stderr", None))
-            retryable = not isinstance(exc, PipelineV2Error) and (
-                error_type in step.retry.retry_exceptions
+            retryable = (
+                step.kind not in NON_RETRYABLE_GATE_KINDS
+                and not isinstance(exc, PipelineV2Error)
+                and error_type in step.retry.retry_exceptions
             )
         ended_at = self._timestamp()
         stdout_hash = self._write_log(stdout_path, stdout)
@@ -589,6 +595,10 @@ class DagRunner:
         }
         if unexpected:
             raise CheckpointError(f"Checkpoint contains unknown step keys: {unexpected}")
+        if set(checkpoint.idempotency_keys) != set(checkpoint.input_hashes):
+            raise CheckpointError(
+                "Checkpoint idempotency_keys and input_hashes must record the same steps"
+            )
         steps = spec.step_map
         for step_id, attempts in checkpoint.attempts.items():
             if len(attempts) > steps[step_id].retry.max_attempts:
@@ -598,6 +608,21 @@ class DagRunner:
                 attempt.idempotency_key != expected_key for attempt in attempts
             ):
                 raise CheckpointError(f"Attempt idempotency key mismatch for step {step_id!r}")
+        for step_id, saved_key in checkpoint.idempotency_keys.items():
+            step = steps[step_id]
+            current_inputs = self._collect_input_hashes(spec, step)
+            if checkpoint.input_hashes[step_id] != current_inputs:
+                raise ArtifactIntegrityError(
+                    f"Input artifact hashes changed for recorded step {step_id!r}"
+                )
+            current_key = self._idempotency_key(
+                spec,
+                step,
+                checkpoint.run_id,
+                current_inputs,
+            )
+            if saved_key != current_key:
+                raise CheckpointError(f"Idempotency key changed for recorded step {step_id!r}")
         sequences = [event.sequence for event in checkpoint.events]
         if sequences != list(range(1, len(sequences) + 1)):
             raise CheckpointError("Checkpoint event sequence is not contiguous")

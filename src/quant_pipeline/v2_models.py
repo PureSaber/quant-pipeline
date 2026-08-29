@@ -28,6 +28,17 @@ class CheckpointError(PipelineV2Error):
     """Raised when a checkpoint is corrupt or incompatible with the run."""
 
 
+NON_RETRYABLE_GATE_KINDS = frozenset(
+    {
+        "data_quality",
+        "schema_validation",
+        "sequence_validation",
+        "hash_validation",
+        "pit_validation",
+    }
+)
+
+
 class StepStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"

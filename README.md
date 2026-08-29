@@ -77,17 +77,22 @@ quant-pipe run --config pipeline-v2.yaml --stack-manifest stack-manifest.json --
 
 The runner uses lexicographically deterministic topology ordering. Failed descendants become
 `blocked`; independent branches continue unless `fail_fast` is enabled. Retries match only the
-configured process exit codes or executor exception names. Contract, schema, path, and artifact hash
-failures never retry.
+configured process exit codes or executor exception names. Steps whose `kind` is `data_quality`,
+`schema_validation`, `sequence_validation`, `hash_validation`, or `pit_validation` are fail-closed
+gates: their failures never retry even if a retry matcher is configured. Contract, path, and
+artifact hash failures also never retry.
 
 Each attempt has separate immutable stdout/stderr logs and SHA-256 values. Checkpoints are canonical
 JSON, self-hashed, fsynced, and atomically replaced after state transitions. Resume verifies the run
 ID, config hash, stack manifest hash, seed, event sequence, attempt logs, idempotency keys, and every
-immutable output hash. Missing or modified inputs, outputs, or logs fail closed.
+immutable output hash. This validation also applies to a pending retry checkpoint before any resume
+event or replacement checkpoint is written. Missing or modified inputs, outputs, or logs fail
+closed.
 
-The v2 implementation consumes a stack manifest as JSON or a mapping, keeping runtime validation
-decoupled from the producer implementation. The optional workspace integration is pinned to the
-published `quant-workspace v0.2.0` tag; CI installs it only through `requirements-dev.lock`.
+The v2 implementation accepts only a canonical, self-hashed, release-ready `StackManifest 1.0.0`
+produced by the published `quant-workspace v0.2.0` contract. File inputs must use canonical JSON;
+both files and mappings are validated by `quant-workspace`. The integration is a required runtime
+dependency and is pinned in `requirements-dev.lock`.
 
 This package does not provide distributed scheduling, network execution, credentials, or live order
 submission.

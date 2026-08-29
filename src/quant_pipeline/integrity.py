@@ -9,6 +9,14 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
+from quant_workspace import (
+    StackManifest,
+    validate_stack_manifest,
+)
+from quant_workspace import (
+    load_stack_manifest as load_workspace_stack_manifest,
+)
+
 from quant_pipeline.v2_models import ArtifactIntegrityError, CheckpointError
 
 
@@ -61,28 +69,20 @@ def hash_artifact_path(path: Path) -> str:
 
 
 def load_stack_manifest(value: Mapping[str, Any] | Path | str) -> dict[str, Any]:
-    if isinstance(value, (str, Path)):
-        path = Path(value)
-        try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise CheckpointError(f"Cannot load stack manifest {path}: {exc}") from exc
-    else:
-        loaded = dict(value)
-    if not isinstance(loaded, dict):
-        raise CheckpointError("Stack manifest root must be an object")
-    return loaded
+    try:
+        if isinstance(value, (str, Path)):
+            manifest = load_workspace_stack_manifest(Path(value))
+        else:
+            manifest = StackManifest.from_dict(dict(value))
+    except (OSError, TypeError, ValueError) as exc:
+        raise CheckpointError(f"Cannot load strict StackManifest: {exc}") from exc
+    result = validate_stack_manifest(manifest)
+    if not result.valid or not result.release_ready:
+        codes = ", ".join(issue.code for issue in result.issues) or "NOT_RELEASE_READY"
+        raise CheckpointError(f"StackManifest is not release-ready: {codes}")
+    return manifest.to_dict()
 
 
 def stack_manifest_hash(value: Mapping[str, Any] | Path | str) -> tuple[dict[str, Any], str]:
     manifest = load_stack_manifest(value)
-    if manifest.get("schema_version") != "1.0.0":
-        raise CheckpointError("Stack manifest schema_version must be '1.0.0'")
-    payload = dict(manifest)
-    embedded = payload.pop("manifest_sha256", None)
-    calculated = sha256_bytes(canonical_json_bytes(payload))
-    if embedded is not None and embedded != calculated:
-        raise CheckpointError(
-            f"Stack manifest hash mismatch: expected {embedded}, calculated {calculated}"
-        )
-    return manifest, calculated
+    return manifest, str(manifest["manifest_hash"])

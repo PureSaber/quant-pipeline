@@ -13,8 +13,8 @@ from quant_pipeline.dag_schema import (
     pipeline_config_hash,
     validate_pipeline_spec,
 )
-from quant_pipeline.integrity import canonical_json_bytes, sha256_bytes, stack_manifest_hash
-from quant_pipeline.v2_models import PipelineSpecError
+from quant_pipeline.integrity import stack_manifest_hash
+from quant_pipeline.v2_models import CheckpointError, PipelineSpecError
 
 
 def _codes(path: Path) -> set[str]:
@@ -178,15 +178,28 @@ def test_invalid_retry_timeout_ids_hashes_and_duplicate_references(tmp_path: Pat
     } <= codes
 
 
-def test_stack_manifest_validation_and_embedded_hash() -> None:
+def test_stack_manifest_requires_release_ready_embedded_hash() -> None:
     payload = dict(STACK_MANIFEST)
-    digest = sha256_bytes(canonical_json_bytes(payload))
-    payload["manifest_sha256"] = digest
     loaded, actual = stack_manifest_hash(payload)
-    assert loaded["manifest_sha256"] == actual == digest
-    payload["manifest_sha256"] = "0" * 64
-    with pytest.raises(Exception, match="hash mismatch"):
+    assert loaded["manifest_hash"] == actual == STACK_MANIFEST["manifest_hash"]
+
+    payload["manifest_hash"] = "0" * 64
+    with pytest.raises(CheckpointError, match="MANIFEST_HASH_MISMATCH"):
         stack_manifest_hash(payload)
+
+    missing_hash = dict(STACK_MANIFEST)
+    missing_hash.pop("manifest_hash")
+    with pytest.raises(CheckpointError, match="Invalid StackManifest payload"):
+        stack_manifest_hash(missing_hash)
+
+    with pytest.raises(CheckpointError, match="Invalid StackManifest payload"):
+        stack_manifest_hash(
+            {
+                "schema_version": "1.0.0",
+                "created_at": "2026-08-29T00:00:00Z",
+                "repositories": [],
+            }
+        )
 
 
 def test_topology_and_config_hash_are_order_and_location_stable(tmp_path: Path) -> None:

@@ -142,9 +142,14 @@ def test_directory_hash_rejects_symlink_entries(
 
 def test_stack_manifest_mapping_and_file_loading(tmp_path: Path) -> None:
     path = tmp_path / "stack.json"
-    path.write_text(json.dumps(STACK_MANIFEST), encoding="utf-8")
+    path.write_bytes(canonical_json_bytes(STACK_MANIFEST) + b"\n")
     assert load_stack_manifest(path) == STACK_MANIFEST
     assert stack_manifest_hash(path)[1] == stack_manifest_hash(STACK_MANIFEST)[1]
+
+    noncanonical = tmp_path / "noncanonical.json"
+    noncanonical.write_text(json.dumps(STACK_MANIFEST), encoding="utf-8")
+    with pytest.raises(CheckpointError, match="not canonical JSON"):
+        load_stack_manifest(noncanonical)
 
     malformed = tmp_path / "malformed.json"
     malformed.write_text("not-json", encoding="utf-8")

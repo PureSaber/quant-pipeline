@@ -12,6 +12,7 @@ from v2_helpers import (
     base_config,
     fixed_clock,
     python_write_command,
+    release_manifest,
     write_config,
 )
 
@@ -30,6 +31,7 @@ def _step(
     step_id: str,
     output: str,
     *,
+    kind: str = "fixture",
     needs: list[str] | None = None,
     inputs: list[str] | None = None,
     command: list[str] | None = None,
@@ -37,7 +39,7 @@ def _step(
 ) -> dict:
     return {
         "id": step_id,
-        "kind": "fixture",
+        "kind": kind,
         "needs": needs or [],
         "command": command or python_write_command(output),
         "inputs": inputs or [],
@@ -166,6 +168,49 @@ def test_retry_only_explicit_exception(tmp_path: Path) -> None:
     assert result.attempts["build"][0].error_type == "OSError"
 
 
+def test_pending_retry_resume_rejects_changed_input_before_checkpoint_write(
+    tmp_path: Path,
+) -> None:
+    config = base_config()
+    input_path = tmp_path / "inputs/source.txt"
+    input_path.parent.mkdir(parents=True)
+    input_path.write_text("source-v1", encoding="utf-8")
+    config["artifacts"].insert(
+        0,
+        {
+            "artifact_id": "source",
+            "path": "inputs/source.txt",
+            "producer": None,
+            "required": True,
+            "immutable": True,
+        },
+    )
+    config["steps"][0]["inputs"] = ["source"]
+    config["steps"][0]["command"] = [sys.executable, "-c", "raise SystemExit(75)"]
+    config["steps"][0]["retry"] = {
+        "max_attempts": 2,
+        "retry_exit_codes": [75],
+        "backoff_seconds": 1,
+    }
+
+    def interrupt_retry(_: float) -> None:
+        raise RuntimeError("simulated process interruption")
+
+    spec = load_pipeline_spec(write_config(tmp_path, config))
+    with pytest.raises(RuntimeError, match="simulated process interruption"):
+        _runner(sleeper=interrupt_retry).run(spec, "pending-retry")
+
+    checkpoint_before = spec.checkpoint_path.read_bytes()
+    checkpoint = load_checkpoint(spec.checkpoint_path)
+    assert checkpoint.step_status["build"] == StepStatus.PENDING
+    assert len(checkpoint.attempts["build"]) == 1
+    input_path.write_text("source-v2", encoding="utf-8")
+
+    with pytest.raises(ArtifactIntegrityError, match="changed for recorded step"):
+        _runner(spec=spec).resume(spec.checkpoint_path)
+    assert spec.checkpoint_path.read_bytes() == checkpoint_before
+
+
 def test_unconfigured_failure_does_not_retry_and_isolates_independent_branch(
     tmp_path: Path,
 ) -> None:
@@ -209,8 +254,9 @@ def test_data_quality_failure_blocks_curated_and_strategy_descendants_but_keeps_
         _step(
             "data_quality_gate",
             "artifacts/quality.json",
+            kind="data_quality",
             command=[sys.executable, "-c", "raise SystemExit(23)"],
-            retry={"max_attempts": 3, "retry_exit_codes": [75]},
+            retry={"max_attempts": 3, "retry_exit_codes": [23]},
         ),
         _step(
             "curated_builder",
@@ -423,7 +469,7 @@ def test_resume_rejects_changed_input_definition_stack_seed_and_logs(tmp_path: P
             runner = _runner(spec=spec)
         elif case == "stack":
             runner = DagRunner(
-                stack_manifest={**STACK_MANIFEST, "repositories": ["changed"]},
+                stack_manifest=release_manifest(workspace_config_sha256="2" * 64),
                 seed=7,
                 spec=spec,
                 clock=fixed_clock,
