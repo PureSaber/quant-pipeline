@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puresaber.dev/schema/quant-pipeline/2.0.0",
+  "title": "quant-pipeline typed DAG 2.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "artifacts", "steps"],
+  "properties": {
+    "schema_version": { "const": "2.0.0" },
+    "name": { "type": "string", "minLength": 1 },
+    "workspace_root": { "type": "string", "minLength": 1 },
+    "checkpoint_path": { "type": "string", "minLength": 1 },
+    "log_dir": { "type": "string", "minLength": 1 },
+    "fail_fast": { "type": "boolean", "default": false },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "path", "producer"],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/id" },
+        "path": { "type": "string", "minLength": 1 },
+        "producer": {
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "schema_id": { "type": "string", "minLength": 1 },
+        "schema_version": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean", "default": true },
+        "immutable": { "type": "boolean", "default": true },
+        "expected_sha256": { "$ref": "#/$defs/sha256" },
+        "actual_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attempts"],
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1 },
+        "retry_exit_codes": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "uniqueItems": true
+        },
+        "retry_exceptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "backoff_seconds": { "type": "number", "minimum": 0 }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "needs",
+        "command",
+        "inputs",
+        "outputs",
+        "retry",
+        "timeout"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "minLength": 1 },
+        "needs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "retry": { "$ref": "#/$defs/retry" },
+        "timeout": { "type": "number", "exclusiveMinimum": 0 },
+        "cwd": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

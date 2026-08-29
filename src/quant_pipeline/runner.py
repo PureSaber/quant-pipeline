@@ -52,7 +52,9 @@ def _expand(text: str, env: dict[str, str], *, step_name: str = "step") -> str:
         ) from exc
 
 
-def _build_env(workspace_config: Path | None, extra: dict[str, str] | None = None) -> dict[str, str]:
+def _build_env(
+    workspace_config: Path | None, extra: dict[str, str] | None = None
+) -> dict[str, str]:
     env = dict(os.environ)
     if extra:
         env.update(extra)
@@ -121,7 +123,9 @@ def run_step(
     )
 
 
-def run_pipeline(config_path: Path, *, dry_run: bool = False, stop_on_error: bool = True) -> PipelineResult:
+def run_pipeline(
+    config_path: Path, *, dry_run: bool = False, stop_on_error: bool = True
+) -> PipelineResult:
     cfg = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
     name = str(cfg.get("name", config_path.stem))
     workspace_cfg = cfg.get("workspace")
@@ -141,7 +145,9 @@ def run_pipeline(config_path: Path, *, dry_run: bool = False, stop_on_error: boo
         step_name = str(raw_step.get("name", "step"))
         command = _expand(str(raw_step["cmd"]), env, step_name=step_name)
         if dry_run:
-            result.steps.append(StepResult(name=step_name, command=command, exit_code=0, duration_s=0.0))
+            result.steps.append(
+                StepResult(name=step_name, command=command, exit_code=0, duration_s=0.0)
+            )
             continue
         step_cwd = cwd
         if raw_step.get("cwd"):

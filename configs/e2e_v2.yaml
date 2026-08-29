@@ -1,0 +1,28 @@
+schema_version: "2.0.0"
+name: typed-dag-smoke
+workspace_root: ".."
+checkpoint_path: ".quant-pipeline/smoke-checkpoint.json"
+log_dir: ".quant-pipeline/logs"
+fail_fast: false
+artifacts:
+  - artifact_id: smoke_output
+    path: "artifacts/v2-smoke.txt"
+    producer: smoke
+    required: true
+    immutable: true
+steps:
+  - id: smoke
+    kind: integration
+    needs: []
+    command:
+      - python
+      - -c
+      - "from pathlib import Path; p=Path('artifacts/v2-smoke.txt'); p.parent.mkdir(parents=True, exist_ok=True); p.write_text('ok', encoding='utf-8')"
+    inputs: []
+    outputs: [smoke_output]
+    retry:
+      max_attempts: 1
+      retry_exit_codes: []
+      retry_exceptions: []
+      backoff_seconds: 0
+    timeout: 30
