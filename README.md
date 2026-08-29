@@ -1,13 +1,26 @@
 # quant-pipeline
 
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the
-PureSaber quant stack. Version 0.3.0 adds the typed `schema_version: "2.0.0"` DAG while preserving
-the existing v1 linear YAML behavior.
+PureSaber quant stack. Version 0.3.1 retains the typed `schema_version: "2.0.0"` DAG introduced in
+0.3.0 while updating only release governance and the published workspace dependency. The existing
+v1 linear YAML behavior remains available.
 
 ## Install
 
 ```bash
-pip install -r requirements-dev.lock
+pip install --no-deps -r requirements.lock
+pip check
+pip install -e . --no-deps --no-build-isolation
+pip check
+```
+
+Rebuild the complete runtime, development, and editable-build lock with Python 3.10 so the oldest
+supported interpreter's conditional dependency closure remains explicit:
+
+```bash
+python -m piptools compile --extra dev --build-deps-for editable \
+  --allow-unsafe --strip-extras --resolver backtracking \
+  --index-url https://pypi.org/simple --output-file requirements.lock pyproject.toml
 ```
 
 ## V1 compatibility
@@ -90,9 +103,16 @@ event or replacement checkpoint is written. Missing or modified inputs, outputs,
 closed.
 
 The v2 implementation accepts only a canonical, self-hashed, release-ready `StackManifest 1.0.0`
-produced by the published `quant-workspace v0.2.0` contract. File inputs must use canonical JSON;
+produced by the published `quant-workspace v0.2.1` contract. The dependency uses the immutable
+annotated tag `v0.2.1`, which peels to commit
+`d94114084b8993e4e5140cee29e92e1db53d1b04`. File inputs must use canonical JSON;
 both files and mappings are validated by `quant-workspace`. The integration is a required runtime
-dependency and is pinned in `requirements-dev.lock`.
+dependency and is pinned in `requirements.lock`.
+
+The 0.3.1 migration only replaces the workspace dependency tag and lock/install governance; it does
+not change DAG, checkpoint, retry, integrity, or v1 compatibility semantics. To roll back the
+candidate, use `git revert <0.3.1-governance-commit>` and rebuild the lock from the reverted
+`pyproject.toml`. Never move or recreate `v0.3.0` or any other historical tag.
 
 This package does not provide distributed scheduling, network execution, credentials, or live order
 submission.
