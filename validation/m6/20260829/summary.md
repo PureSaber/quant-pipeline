@@ -22,7 +22,7 @@ ruff format --check src tests
 pytest -q --junitxml=validation/m6/20260829/pytest-full.xml \
   --cov=quant_pipeline --cov-branch --cov-report=term-missing \
   --cov-report=json:validation/m6/20260829/coverage-full.json --cov-fail-under=80
-75 passed; total branch coverage 93.63%.
+76 passed; total branch coverage 93.28%.
 
 pytest -q tests/test_v2_schema.py tests/test_dag_runner.py tests/test_integrity_checkpoint.py \
   --junitxml=validation/m6/20260829/pytest-core.xml \
@@ -30,21 +30,27 @@ pytest -q tests/test_v2_schema.py tests/test_dag_runner.py tests/test_integrity_
   --cov=quant_pipeline.checkpoint --cov=quant_pipeline.integrity \
   --cov-branch --cov-report=term-missing \
   --cov-report=json:validation/m6/20260829/coverage-core.json
-52 passed; combined report is informational; pure branch gates are checked per file from JSON.
+53 passed; combined report is informational; pure branch gates are checked per file from JSON.
 ```
 
 Core pure branch coverage from `coverage-core.json`:
 
-- `dag_runner.py`: 96/102 = 94.1176%
+- `dag_runner.py`: 101/110 = 91.8182%
 - `dag_schema.py`: 107/118 = 90.6780%
 - `checkpoint.py`: 29/30 = 96.6667%
-- `integrity.py`: 27/28 = 96.4286%
+- `integrity.py`: 23/24 = 95.8333%
 
 Added regression coverage:
 
-- `data_quality_gate` exits with an unconfigured code and has `max_attempts=3`; it executes once,
+- `data_quality_gate` exits with a configured retry code and has `max_attempts=3`; its exact
+  `data_quality` kind overrides the retry matcher, so it executes once,
   its `curated_builder` and `strategy_research` descendants are `blocked`, and the independent
   branch succeeds when `fail_fast=false`.
+- A pending retry checkpoint records one failed attempt, then a simulated process interruption;
+  changing its external input makes strict resume fail before any resume event or checkpoint write.
+- StackManifest files and mappings must satisfy the published `quant-workspace v0.2.0` model,
+  self-hash, release-readiness, and canonical-file requirements; the old permissive minimal mapping
+  is rejected.
 - Added fail-closed checks for exception stdout/stderr preservation, optional input hashing,
   declared artifact hash, attempt-log collision, existing run-log directory, and exhausted retry
   checkpoint handling.
@@ -53,10 +59,10 @@ Added regression coverage:
 
 ## Evidence hashes
 
-- `pytest-full.xml`: `d7abc5834c17206568f57eeb840f949f26cb3f81dbf8239065f3af221690a8a1`
-- `coverage-full.json`: `9b6c486c1e0130b1c76c271ba679c97768f501fd61007cc70c879049f59833a2`
-- `pytest-core.xml`: `731a21921c380b0cb39aa705d1f46a2079476cbdbfbcc3b2f3b906ad2d4427c7`
-- `coverage-core.json`: `0cc0ec8734cf224a6ebb324c323afedcf62427c27b22bdffc1c2171c3b7a22c6`
+- `pytest-full.xml`: `ee0355e16e65589da1829c58f3261d6e2c2845986506d227d9236f6f0bc9b14c`
+- `coverage-full.json`: `7744b11befb69251b7abb7fbf4a73d3d89a6c50eb295006bba810f1ef9a8fa96`
+- `pytest-core.xml`: `0f5129e55556e5c4e550e969a8a33bd82c40314f9403423abdb3caa0f37247d1`
+- `coverage-core.json`: `797c23bae582a11f95f7eecf6f436bad0d65c95c88ddaf1fc83c5efb573ee1bb`
 
 Python 3.10 and 3.11 were not installed on this workstation. The GitHub Actions matrix is configured
 for Python 3.10, 3.11, and 3.12; those two versions require project-lead push/PR validation.

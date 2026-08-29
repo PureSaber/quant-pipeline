@@ -7,6 +7,7 @@ import yaml
 from v2_helpers import STACK_MANIFEST, base_config, write_config
 
 from quant_pipeline.cli import main
+from quant_pipeline.integrity import canonical_json_bytes
 
 
 def test_v1_cli_json_dry_run(tmp_path: Path, capsys) -> None:
@@ -25,7 +26,7 @@ def test_v2_cli_requires_manifest_and_prints_json(tmp_path: Path, capsys) -> Non
     assert "--stack-manifest" in capsys.readouterr().err
 
     manifest_path = tmp_path / "stack.json"
-    manifest_path.write_text(json.dumps(STACK_MANIFEST), encoding="utf-8")
+    manifest_path.write_bytes(canonical_json_bytes(STACK_MANIFEST) + b"\n")
     exit_code = main(
         [
             "run",
@@ -56,7 +57,7 @@ def test_cli_rejects_v1_resume_and_invalid_v2(tmp_path: Path, capsys) -> None:
     invalid["steps"][0]["command"] = "shell command"
     invalid_path = write_config(tmp_path, invalid, "invalid.yaml")
     manifest = tmp_path / "stack.json"
-    manifest.write_text(json.dumps(STACK_MANIFEST), encoding="utf-8")
+    manifest.write_bytes(canonical_json_bytes(STACK_MANIFEST) + b"\n")
     assert (
         main(
             [

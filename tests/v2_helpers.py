@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,11 +9,33 @@ from typing import Any
 
 import yaml
 
-STACK_MANIFEST: dict[str, Any] = {
-    "schema_version": "1.0.0",
-    "created_at": "2026-08-29T00:00:00Z",
-    "repositories": [],
-}
+
+def release_manifest(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema_version": "1.0.0",
+        "mode": "release",
+        "created_at": "2026-08-29T00:00:00Z",
+        "workspace_config_sha256": "1" * 64,
+        "repositories": [],
+        "dependency_dag": [],
+        "allowed_schemas": [{"schema_id": "standard/v2", "version": "2.0.0"}],
+        "release_ready": True,
+        **overrides,
+    }
+    return {
+        **payload,
+        "manifest_hash": hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
+STACK_MANIFEST = release_manifest()
 
 
 def fixed_clock() -> datetime:
