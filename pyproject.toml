@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quant-pipeline"
-version = "0.3.1"
+version = "0.3.2"
 description = "Typed, deterministic local DAG orchestration for the PureSaber quant stack"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
-    "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.2.1",
+    "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1",
 ]
 
 [project.optional-dependencies]
