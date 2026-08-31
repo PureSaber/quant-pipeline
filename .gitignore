@@ -5,6 +5,8 @@ __pycache__/
 .ruff_cache/
 .coverage
 coverage.json
+coverage-core.json
+coverage-full.json
 htmlcov/
 dist/
 build/
