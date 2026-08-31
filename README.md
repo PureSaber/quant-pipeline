@@ -1,7 +1,7 @@
 # quant-pipeline
 
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the
-PureSaber quant stack. Version 0.3.1 retains the typed `schema_version: "2.0.0"` DAG introduced in
+PureSaber quant stack. Version 0.3.2 retains the typed `schema_version: "2.0.0"` DAG introduced in
 0.3.0 while updating only release governance and the published workspace dependency. The existing
 v1 linear YAML behavior remains available.
 
@@ -103,15 +103,15 @@ event or replacement checkpoint is written. Missing or modified inputs, outputs,
 closed.
 
 The v2 implementation accepts only a canonical, self-hashed, release-ready `StackManifest 1.0.0`
-produced by the published `quant-workspace v0.2.1` contract. The dependency uses the immutable
-annotated tag `v0.2.1`, which peels to commit
-`d94114084b8993e4e5140cee29e92e1db53d1b04`. File inputs must use canonical JSON;
+produced by the published `quant-workspace v0.3.1` contract. The dependency uses the immutable
+annotated tag `v0.3.1`, which peels to commit
+`537388a4d9548b612fa1e4b306c482c04b45c433`. File inputs must use canonical JSON;
 both files and mappings are validated by `quant-workspace`. The integration is a required runtime
 dependency and is pinned in `requirements.lock`.
 
-The 0.3.1 migration only replaces the workspace dependency tag and lock/install governance; it does
+The 0.3.2 migration only replaces the workspace dependency tag and lock/install governance; it does
 not change DAG, checkpoint, retry, integrity, or v1 compatibility semantics. To roll back the
-candidate, use `git revert <0.3.1-governance-commit>` and rebuild the lock from the reverted
+candidate, use `git revert <0.3.2-governance-commit>` and rebuild the lock from the reverted
 `pyproject.toml`. Never move or recreate `v0.3.0` or any other historical tag.
 
 This package does not provide distributed scheduling, network execution, credentials, or live order

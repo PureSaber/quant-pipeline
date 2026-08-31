@@ -32,7 +32,7 @@ pyyaml==6.0.3
     # via
     #   quant-pipeline (pyproject.toml)
     #   quant-workspace
-quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.2.1
+quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1
     # via quant-pipeline (pyproject.toml)
 ruff==0.16.5
     # via quant-pipeline (pyproject.toml)
