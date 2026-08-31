@@ -1,9 +1,10 @@
 # quant-pipeline
 
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the
-PureSaber quant stack. Version 0.3.2 retains the typed `schema_version: "2.0.0"` DAG introduced in
-0.3.0 while updating only release governance and the published workspace dependency. The existing
-v1 linear YAML behavior remains available.
+PureSaber quant stack. Version 0.3.3 retains the typed `schema_version: "2.0.0"` DAG introduced in
+0.3.0, the published workspace dependency from0.3.2, and pins the CI runtime actions to reviewed
+full SHAs. Generated full/core coverage evidence is explicitly ignored locally. The existing v1
+linear YAML behavior remains available.
 
 ## Install
 
@@ -109,10 +110,11 @@ annotated tag `v0.3.1`, which peels to commit
 both files and mappings are validated by `quant-workspace`. The integration is a required runtime
 dependency and is pinned in `requirements.lock`.
 
-The 0.3.2 migration only replaces the workspace dependency tag and lock/install governance; it does
-not change DAG, checkpoint, retry, integrity, or v1 compatibility semantics. To roll back the
-candidate, use `git revert <0.3.2-governance-commit>` and rebuild the lock from the reverted
-`pyproject.toml`. Never move or recreate `v0.3.0` or any other historical tag.
+The0.3.2 migration replaced the workspace dependency tag and lock/install governance. The0.3.3
+change only removes CI-runtime drift and generated coverage-file noise; neither release changes DAG,
+checkpoint, retry, integrity, or v1 compatibility semantics. To roll back the candidate, use
+`git revert <0.3.3-ci-hygiene-commit>` and rebuild from the reverted`pyproject.toml`. Never move or
+recreate any historical tag.
 
 This package does not provide distributed scheduling, network execution, credentials, or live order
 submission.
