@@ -18,7 +18,7 @@ def test_release_and_workspace_governance_are_declared() -> None:
     project = data["project"]
     governance = data["tool"]["quant-workspace"]
 
-    assert project["version"] == "0.3.2"
+    assert project["version"] == "0.3.3"
     assert governance == {
         "layer": "orchestration",
         "schemas": [{"id": "puresaber.pipeline", "version": "2.0.0"}],
