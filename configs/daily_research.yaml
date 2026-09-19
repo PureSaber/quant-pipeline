@@ -1,0 +1,7 @@
+# Paths relative to this config; use your installed common stack interpreter.
+root: ../..
+decision_config: a-share-multifactor/configs/decision_daily.yaml
+output: daily-runs
+timeout_seconds: 900
+# Optional: account_config: private/account.yaml
+report_command: [-m, quant_report_hub.cli, dashboard, --decision-root, "{output}", --lab-db, "{db}", --out, "{output}/../daily-dashboard.html"]
