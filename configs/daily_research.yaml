@@ -1,6 +1,7 @@
 # Paths relative to this config; use your installed common stack interpreter.
 root: ../..
 decision_config: a-share-multifactor/configs/decision_daily.yaml
+data_config: quant-data-kit/configs/research_inputs.yaml
 output: daily-runs
 timeout_seconds: 900
 # Optional: account_config: private/account.yaml
