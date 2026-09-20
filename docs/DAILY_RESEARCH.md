@@ -17,6 +17,11 @@ regeneration. Configure `account_config` only after supplying real
 statements; the repository example is synthetic. `operation-latest.json` is the
 operational result; `latest.json` remains the decision consumer contract.
 
+When `alerts_file` points to the report hub's `quant-report-hub.alerts/v1` sidecar, that file is a
+required completion artifact. Every run also publishes `notification-latest.json`. Schedulers and
+notifiers should stay silent when `notify` is false and surface the included reasons and alerts
+when it is true. Information-only forward-evidence reminders do not wake an operator.
+
 The data policy selects one primary provider per domain. Price shadows are captured
 for comparison only and cannot replace missing primary rows. If the input step fails,
 the decision step receives the absent snapshot and publishes a blocked card, so an

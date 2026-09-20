@@ -23,6 +23,39 @@ def save(path: Path, payload: dict) -> None:
     temporary.replace(path)
 
 
+def build_notification(status: dict, decision: dict | None, alerts: list[dict]) -> dict:
+    """Create a quiet-by-default notification contract for unattended runs."""
+
+    actionable_alerts = [row for row in alerts if row.get("severity") in {"critical", "warning"}]
+    failed = status.get("status") != "completed"
+    blocked = status.get("decision_status") == "blocked"
+    notify = failed or blocked or bool(actionable_alerts)
+    reasons = []
+    if failed:
+        reasons.append(status.get("error") or "daily pipeline failed")
+    if blocked and decision:
+        reasons.extend(str(reason) for reason in decision.get("reasons", []))
+    reasons.extend(str(row.get("message", "")) for row in actionable_alerts)
+    return {
+        "schema_version": "quant-pipeline.notification/v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "invocation": status.get("invocation"),
+        "notify": notify,
+        "severity": (
+            "critical"
+            if failed or blocked or any(row.get("severity") == "critical" for row in alerts)
+            else "warning"
+            if actionable_alerts
+            else "none"
+        ),
+        "pipeline_status": status.get("status"),
+        "decision_status": status.get("decision_status"),
+        "decision": status.get("decision"),
+        "reasons": list(dict.fromkeys(reason for reason in reasons if reason)),
+        "alerts": actionable_alerts,
+    }
+
+
 def _input_request(decision_config: Path, as_of: str | None, now: datetime) -> dict:
     settings = yaml.safe_load(decision_config.read_text(encoding="utf-8"))
     if not isinstance(settings, dict):
@@ -68,6 +101,8 @@ def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = N
         "steps": [],
         "decision_status": "blocked",
     }
+    decision_payload = None
+    alert_rows: list[dict] = []
     try:
         python = (
             str((root / settings["python"]).resolve()) if settings.get("python") else sys.executable
@@ -179,6 +214,7 @@ def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = N
         status["decision_status"] = latest["status"]
         decision = Path(latest["decision"])
         status["decision"] = str(decision)
+        decision_payload = json.loads(decision.read_text(encoding="utf-8"))
         # Scan failed/blocked attempts too. The registry is maintained by the producer.
         invoke(
             "index",
@@ -231,18 +267,46 @@ def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = N
                     str(output / "experiments.html"),
                 ],
             )
+        alerts_file = settings.get("alerts_file")
+        alerts_error = None
+        if alerts_file:
+            alert_path = Path(
+                str(alerts_file)
+                .replace("{output}", str(output))
+                .replace("{db}", str(output / "experiments.db"))
+            )
+            alert_path = alert_path if alert_path.is_absolute() else (root / alert_path).resolve()
+            try:
+                alert_payload = json.loads(alert_path.read_text(encoding="utf-8"))
+                if alert_payload.get(
+                    "schema_version"
+                ) != "quant-report-hub.alerts/v1" or not isinstance(
+                    alert_payload.get("alerts"), list
+                ):
+                    raise ValueError("invalid quant-report-hub alert sidecar")
+                alert_rows = alert_payload["alerts"]
+                status["alerts"] = str(alert_path)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                alerts_error = f"{type(exc).__name__}: {exc}"
+                status["alerts_error"] = alerts_error
         status["status"] = (
             "completed"
             if all(step["exit_code"] == 0 for step in status["steps"])
             and latest["status"] != "blocked"
+            and alerts_error is None
             else "failed"
         )
     except (OSError, ValueError, KeyError, TypeError) as exc:
         status.update(status="failed", error=f"{type(exc).__name__}: {exc}")
     finally:
-        save(log / "operation.json", status)
-        save(output / "operation-latest.json", status)
-        lock.unlink()
+        notification = build_notification(status, decision_payload, alert_rows)
+        try:
+            save(log / "operation.json", status)
+            save(output / "operation-latest.json", status)
+            save(log / "notification.json", notification)
+            save(output / "notification-latest.json", notification)
+        finally:
+            lock.unlink()
     return status
 
 
