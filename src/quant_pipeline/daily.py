@@ -7,8 +7,9 @@ import hashlib
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -22,12 +23,40 @@ def save(path: Path, payload: dict) -> None:
     temporary.replace(path)
 
 
+def _input_request(decision_config: Path, as_of: str | None, now: datetime) -> dict:
+    settings = yaml.safe_load(decision_config.read_text(encoding="utf-8"))
+    if not isinstance(settings, dict):
+        raise TypeError("Decision configuration must be a mapping")
+    watchlist = settings.get("watchlist")
+    if not isinstance(watchlist, list) or not watchlist:
+        raise ValueError("Decision configuration requires a non-empty watchlist")
+    symbols = []
+    for item in watchlist:
+        if not isinstance(item, dict) or not str(item.get("symbol", "")).strip():
+            raise ValueError("Every watchlist item requires a symbol")
+        symbols.append(str(item["symbol"]).strip())
+    local = now.astimezone(ZoneInfo("Asia/Shanghai"))
+    cutoff = datetime.fromisoformat(as_of).date() if as_of else local.date()
+    if as_of is None and local.hour < 16:
+        cutoff = (local - timedelta(days=1)).date()
+    history_days = int(settings.get("history_days", 730))
+    if history_days < 1:
+        raise ValueError("history_days must be positive")
+    start = cutoff - timedelta(days=history_days)
+    return {
+        "symbols": symbols,
+        "start": start.isoformat(),
+        "end": cutoff.isoformat(),
+    }
+
+
 def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = None) -> dict:
     settings = yaml.safe_load(config.read_text(encoding="utf-8"))
     root = (config.parent / settings.get("root", "..")).resolve()
     output = (root / settings["output"]).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    invocation = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    invoked_at = datetime.now(timezone.utc)
+    invocation = invoked_at.strftime("%Y%m%dT%H%M%S%fZ")
     log = output / "operations" / invocation
     log.mkdir(parents=True)
     lock = output / ".pipeline.lock"
@@ -72,6 +101,35 @@ def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = N
             )
             return code
 
+        selected_inputs = inputs.resolve() if inputs else None
+        data_config = settings.get("data_config")
+        if selected_inputs is None and data_config:
+            decision_config = (root / settings["decision_config"]).resolve()
+            request = _input_request(decision_config, as_of, invoked_at)
+            selected_inputs = output / "input-snapshots" / invocation
+            status["inputs"] = str(selected_inputs)
+            invoke(
+                "inputs",
+                [
+                    "-m",
+                    "quant_data_kit.research_inputs",
+                    "--config",
+                    str((root / data_config).resolve()),
+                    "--output",
+                    str(selected_inputs),
+                    "--symbols",
+                    *request["symbols"],
+                    "--start",
+                    request["start"],
+                    "--end",
+                    request["end"],
+                    "--captured-at",
+                    invoked_at.isoformat(),
+                ],
+            )
+        elif selected_inputs is not None:
+            status["inputs"] = str(selected_inputs)
+
         producer = [
             "-m",
             "a_share_multifactor.decision_workflow",
@@ -80,8 +138,8 @@ def run_daily(config: Path, *, inputs: Path | None = None, as_of: str | None = N
             "--output",
             str(output),
         ]
-        if inputs:
-            producer += ["--inputs", str(inputs.resolve())]
+        if selected_inputs:
+            producer += ["--inputs", str(selected_inputs)]
         if as_of:
             producer += ["--as-of", as_of]
         pointer = output / "latest.json"

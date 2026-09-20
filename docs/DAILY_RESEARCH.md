@@ -9,10 +9,19 @@ python -m quant_pipeline.daily --config configs/daily_research.yaml
 
 The YAML root is relative to the config file. Every invocation records subprocess
 exit codes, stdout/stderr and their hashes under `output/operations/<invocation>`.
-The steps are decision generation, experiment indexing, optional account import,
-then dashboard regeneration. Configure `account_config` only after supplying real
+When `data_config` is set, the first step calls `quant-data-kit` to publish an
+immutable normalized input snapshot. The decision producer receives that directory
+through `--inputs` and remains unaware of provider SDKs. The remaining steps are
+decision generation, experiment indexing, optional account import, then dashboard
+regeneration. Configure `account_config` only after supplying real
 statements; the repository example is synthetic. `operation-latest.json` is the
 operational result; `latest.json` remains the decision consumer contract.
+
+The data policy selects one primary provider per domain. Price shadows are captured
+for comparison only and cannot replace missing primary rows. If the input step fails,
+the decision step receives the absent snapshot and publishes a blocked card, so an
+older successful pointer is never reused. An explicit CLI `--inputs` directory takes
+precedence over `data_config` and performs no live capture.
 
 Failure refreshes the latest decision to blocked, including a producer crash that
 published nothing. The report still runs and shows that failure. A report failure
