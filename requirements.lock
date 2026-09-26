@@ -69,11 +69,11 @@ pyyaml==6.0.3
     #   quant-lab
     #   quant-pipeline (pyproject.toml)
     #   quant-workspace
-quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@104f1ef8a3b1278c0ea5420fadaa9d1d863ce726
+quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@b5621379e1a15562371be31c03f354a6acf512e4
     # via quant-factors
-quant-factors @ git+https://github.com/PureSaber/quant-factors.git@313243588a0ea090a399244eccbc8e1833119b3a
+quant-factors @ git+https://github.com/PureSaber/quant-factors.git@482e184b4b9b66b47c7528b6cc01cf3077ce78d3
     # via quant-pipeline (pyproject.toml)
-quant-lab @ git+https://github.com/PureSaber/quant-lab.git@8f47d2ba69ee532d7559957e4b2fb36c2b13a3d8
+quant-lab @ git+https://github.com/PureSaber/quant-lab.git@6ad789442a5ff7b5e3f68d241ecf0ee327f7e82f
     # via quant-pipeline (pyproject.toml)
 quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1
     # via quant-pipeline (pyproject.toml)

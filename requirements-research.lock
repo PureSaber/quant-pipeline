@@ -108,13 +108,13 @@ xlrd==2.0.2
 xxhash==4.0.1
 zstandard==0.25.0
 
-quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@104f1ef8a3b1278c0ea5420fadaa9d1d863ce726
-quant-execution @ git+https://github.com/PureSaber/quant-execution.git@dc03e0693031169a80e0eefd06fff424d0a1bc25
-quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@a80ffbc4d5896d3c9fe9e29c32f3c1982a8c713b
-quant-risk-monitor @ git+https://github.com/PureSaber/quant-risk-monitor.git@65499e57aacbbd5c905055d7d38b5446e95ba173
-quant-lab @ git+https://github.com/PureSaber/quant-lab.git@8f47d2ba69ee532d7559957e4b2fb36c2b13a3d8
-quant-factors @ git+https://github.com/PureSaber/quant-factors.git@313243588a0ea090a399244eccbc8e1833119b3a
-quant-agent @ git+https://github.com/PureSaber/quant-agent.git@8914ca6082a01fcc817e59bbb11ae479f7d6a65d
-a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@3143574dab54e339b57a3c6a51b89befc24f385a
-quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@ab1300c996f8b39f24a6002128bcc194b12d65da
+quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@b5621379e1a15562371be31c03f354a6acf512e4
+quant-execution @ git+https://github.com/PureSaber/quant-execution.git@99ab9b1445d72164fa4e8c6d1ebde859b80dba1f
+quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@3d0f8585ce62140967cfbeb4d6ed2c8d37feb325
+quant-risk-monitor @ git+https://github.com/PureSaber/quant-risk-monitor.git@161f0e6ec3cb4d55d94fcd8f28fe62529bbb0dab
+quant-lab @ git+https://github.com/PureSaber/quant-lab.git@6ad789442a5ff7b5e3f68d241ecf0ee327f7e82f
+quant-factors @ git+https://github.com/PureSaber/quant-factors.git@482e184b4b9b66b47c7528b6cc01cf3077ce78d3
+quant-agent @ git+https://github.com/PureSaber/quant-agent.git@7c6138d5e9134961abc158fb07e6e872edc49e95
+a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@7912edd86a2fd016c5b913f8e8688d9a224c3c61
+quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@314174c86e5680e9a4129af3e1a1b8cc1ae581d3
 quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1
