@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from dataclasses import replace
@@ -45,9 +46,20 @@ def run(request):
     import yaml
     from quant_lab import load_and_validate_standard_run
 
+    request = request.resolve()
     payload = json.loads(request.read_text(encoding="utf-8"))
     recipe, candidate = payload["recipe"], payload["candidate"]
     inspect(recipe["backend"])
+    # Legacy certified writers resolve provenance from cwd. Keep absolute output
+    # paths while running inside the already-verified strategy checkout.
+    if recipe["backend"] == "crypto_fixture":
+        import quant_crypto_basis
+
+        os.chdir(Path(quant_crypto_basis.__file__).resolve().parents[2])
+    else:
+        import qfs_certified
+
+        os.chdir(Path(qfs_certified.__file__).resolve().parents[1])
     out = request.parent
     parameters = candidate["backend_parameters"]
     if recipe["backend"] == "crypto_fixture":
