@@ -250,9 +250,7 @@ def _master_inputs(
     frames = {
         "raw": raw,
         "adjusted": raw.assign(adjustment="qfq"),
-        "benchmark": pd.DataFrame(
-            {"date": sessions, "benchmark_return": [0.0] * len(sessions)}
-        ),
+        "benchmark": pd.DataFrame({"date": sessions, "benchmark_return": [0.0] * len(sessions)}),
         "calendar": pd.DataFrame(
             {
                 "date": pd.DatetimeIndex(
@@ -405,9 +403,7 @@ def test_verified_master_refresh_and_future_rows_advance_forward_account(
         executor=ledger,
     )
     assert observed["as_of"] == "2023-06-01"
-    assert observed["input_prefix"]["catalog"]["kind"] == (
-        "verified-instrument-master-prefix"
-    )
+    assert observed["input_prefix"]["catalog"]["kind"] == ("verified-instrument-master-prefix")
 
 
 @pytest.mark.parametrize(
