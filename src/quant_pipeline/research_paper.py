@@ -292,6 +292,7 @@ def observe(root: Path, inputs: dict, *, as_of: str, now=None, executor=None) ->
     from a_share_multifactor.decision_workflow import load_inputs
     from a_share_multifactor.research_workbench import EquityResearchExecutor
 
+    root = root.resolve()
     now = _now(now)
     date.fromisoformat(as_of)
     with study_lock(root):

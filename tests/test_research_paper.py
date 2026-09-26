@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -55,8 +56,12 @@ def ledger(recipe, candidate, output):
     return {"metrics": return_metrics(returns), "scope": "synthetic-test"}
 
 
-def test_forward_account_advance_resume_and_one_time_seal(account):
+@pytest.mark.parametrize("relative_path", [False, True])
+def test_forward_account_advance_resume_and_one_time_seal(account, monkeypatch, relative_path):
     root, inputs = account
+    if relative_path:
+        monkeypatch.chdir(root.parent)
+        root = Path(root.name)
     first = paper.observe(
         root,
         inputs,
@@ -331,10 +336,14 @@ def test_promotion_cannot_rebaseline_inputs_revised_since_source_study(account, 
         )
 
 
+@pytest.mark.parametrize("relative_path", [False, True])
 def test_observation_recovers_derived_file_failure_without_a_second_terminal_event(
-    account, monkeypatch
+    account, monkeypatch, relative_path
 ):
     root, inputs = account
+    if relative_path:
+        monkeypatch.chdir(root.parent)
+        root = Path(root.name)
     original = paper.atomic_json
 
     def fail_latest(path, value):
