@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from quant_lab.research import canonical, execute_study, file_hash, load_recipe
+from quant_lab.research import canonical, digest, execute_study, file_hash, load_recipe
 
 
 def code_identity() -> dict:
@@ -47,12 +47,24 @@ def input_identity(recipe: dict) -> dict:
             )
             for name, item in entries.items():
                 target = (path / item["file"]).resolve()
-                if target.parent != path.resolve() or file_hash(target) != item["sha256"]:
+                if path.resolve() not in target.parents or file_hash(target) != item["sha256"]:
                     raise ValueError(f"Input integrity failure: {key}/{name}")
                 evidence[key][name] = item["sha256"]
         else:
             raise FileNotFoundError(path)
     return evidence
+
+
+def equity_code_identity() -> dict:
+    import a_share_multifactor
+    from a_share_multifactor.run_contract import _code_version, _installed_internal_dependencies
+
+    identity = code_identity()
+    identity["a_share_multifactor"] = _code_version(
+        Path(a_share_multifactor.__file__).resolve().parents[2]
+    )
+    identity.update(_installed_internal_dependencies())
+    return identity
 
 
 class FixtureExecutor:
@@ -94,20 +106,30 @@ class FixtureExecutor:
         return json.loads((output / "worker-result.json").read_text(encoding="utf-8"))
 
 
-def run_research(recipe_path: Path, output: Path, *, fixture_python: Path | None = None) -> dict:
+def run_research(
+    recipe_path: Path,
+    output: Path,
+    *,
+    fixture_python: Path | None = None,
+    expected_recipe_sha256: str | None = None,
+) -> dict:
     recipe = load_recipe(recipe_path)
+    if expected_recipe_sha256 is not None and digest(recipe) != expected_recipe_sha256:
+        raise ValueError("Recipe differs from the frozen execution request")
     identity = code_identity()
     data = input_identity(recipe)
     if recipe["backend"] == "equity":
-        import a_share_multifactor
         from a_share_multifactor.research_workbench import EquityResearchExecutor
-        from a_share_multifactor.run_contract import _code_version, _installed_internal_dependencies
 
-        identity["a_share_multifactor"] = _code_version(
-            Path(a_share_multifactor.__file__).resolve().parents[2]
-        )
-        identity.update(_installed_internal_dependencies())
+        identity = equity_code_identity()
         executor = EquityResearchExecutor()
+        if recipe.get("validation"):
+            from a_share_multifactor.decision_workflow import load_inputs
+
+            from quant_pipeline.research_validation import WalkForwardExecutor
+
+            _, frames = load_inputs(Path(recipe["inputs"]["bundle"]))
+            executor = WalkForwardExecutor(executor, frames["calendar"]["date"])
     else:
         if fixture_python is None:
             raise ValueError(
@@ -119,6 +141,10 @@ def run_research(recipe_path: Path, output: Path, *, fixture_python: Path | None
     from quant_report_hub.research_workbench import render_study
 
     render_study(output / "study.json", output / "research.html")
+    if recipe.get("validation"):
+        from quant_pipeline.research_validation import write_validation_report
+
+        write_validation_report(result, output)
     return result
 
 
@@ -127,8 +153,14 @@ def main():
     parser.add_argument("recipe", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--fixture-python", type=Path)
+    parser.add_argument("--expected-recipe-sha256")
     args = parser.parse_args()
-    result = run_research(args.recipe, args.output, fixture_python=args.fixture_python)
+    result = run_research(
+        args.recipe,
+        args.output,
+        fixture_python=args.fixture_python,
+        expected_recipe_sha256=args.expected_recipe_sha256,
+    )
     print(
         json.dumps(
             {

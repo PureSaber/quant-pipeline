@@ -12,7 +12,7 @@ import pandas as pd
 import yaml
 
 
-def create_demo(output: Path, *, asset: str = "etf") -> Path:
+def create_demo(output: Path, *, asset: str = "etf", advanced: bool = False) -> Path:
     if asset not in {"etf", "equity"}:
         raise ValueError("asset must be equity or etf")
     output.mkdir(parents=True, exist_ok=False)
@@ -119,6 +119,85 @@ def create_demo(output: Path, *, asset: str = "etf") -> Path:
         "variants": [],
         "source": {"scope": "synthetic-software-demonstration"},
     }
+    if advanced:
+        from quant_data_kit.research_coverage import import_history
+
+        records = []
+        states = {
+            "listed": "true",
+            "delisted": "false",
+            "tradable": "true",
+            "limit_up": "false",
+            "limit_down": "false",
+            "member": "true",
+        }
+
+        def state(symbol, day, field, value):
+            stamp = (
+                pd.Timestamp(day).tz_localize("Asia/Shanghai") + pd.Timedelta(hours=8)
+            ).isoformat()
+            records.append(
+                {
+                    "symbol": symbol,
+                    "domain": "universe" if field == "member" else "status",
+                    "field": field,
+                    "value": value,
+                    "effective_at": stamp,
+                    "available_at": stamp,
+                }
+            )
+
+        for symbol in symbols:
+            for field, value in states.items():
+                state(symbol, dates[0], field, value)
+        state(symbols[0], dates[220], "member", "false")
+        state(symbols[0], dates[245], "member", "true")
+        state(symbols[1], dates[255], "tradable", "false")
+        state(symbols[1], dates[260], "tradable", "true")
+        state(symbols[2], dates[280], "limit_up", "true")
+        state(symbols[2], dates[282], "limit_up", "false")
+        source = output / "synthetic-history.csv"
+        pd.DataFrame(records).to_csv(source, index=False)
+        import_history(
+            source,
+            output / "history",
+            provider="synthetic-fixture",
+            source_uri="fixture://advanced-research-demo",
+            license_note="Generated software test data",
+        )
+        recipe.update(
+            study_id=f"synthetic-{asset}-advanced",
+            factors={"risk_adjusted_momentum": 1},
+            factor_expressions={
+                "risk_adjusted_momentum": "momentum_20d / clip(volatility_20d, 0.005, 1)"
+            },
+            allocation={"mode": "equal", "lookback": 20, "min_observations": 10, "max_turnover": 2},
+            execution={
+                "mode": "dynamic",
+                "universe_field": "member",
+                "max_retry_sessions": 5,
+                "status_fields": {name: name for name in states if name != "member"},
+            },
+            required_history={
+                name: "universe" if name == "member" else "status" for name in states
+            },
+            validation={
+                "method": "walk_forward",
+                "train_sessions": 80,
+                "test_sessions": 40,
+                "embargo_sessions": 5,
+                "selection_metric": "total_return",
+            },
+            diagnostics={"cost_multipliers": [2], "signal_delays": [1]},
+            variants=[
+                {"name": "plain_momentum", "factors": {"momentum_20d": 1}},
+                {"name": "inverse_vol", "allocation": {"mode": "inverse_vol", "max_turnover": 2}},
+                {"name": "cost_aware", "allocation": {"mode": "cost_aware", "max_turnover": 2}},
+            ],
+        )
+        recipe["inputs"]["history"] = "history"
+        # Leave capacity for non-equal weights so allocation comparisons are meaningful.
+        recipe["strategy"]["max_weight"] = 0.35
     path = output / "recipe.yaml"
     path.write_text(yaml.safe_dump(recipe, sort_keys=False), encoding="utf-8")
     return path
@@ -128,5 +207,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--asset", choices=["etf", "equity"], default="etf")
+    parser.add_argument(
+        "--advanced",
+        action="store_true",
+        help="Include expressions, rolling validation, allocation and synthetic trading states",
+    )
     args = parser.parse_args()
-    print(create_demo(args.output, asset=args.asset))
+    print(create_demo(args.output, asset=args.asset, advanced=args.advanced))
