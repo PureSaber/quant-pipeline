@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --no-deps -r requirements.lock
+          pip install --no-deps -r requirements-research.lock
           pip check
           pip install -e . --no-deps --no-build-isolation
           pip check
