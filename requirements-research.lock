@@ -113,8 +113,8 @@ quant-execution @ git+https://github.com/PureSaber/quant-execution.git@dc03e0693
 quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@a80ffbc4d5896d3c9fe9e29c32f3c1982a8c713b
 quant-risk-monitor @ git+https://github.com/PureSaber/quant-risk-monitor.git@65499e57aacbbd5c905055d7d38b5446e95ba173
 quant-lab @ git+https://github.com/PureSaber/quant-lab.git@8f47d2ba69ee532d7559957e4b2fb36c2b13a3d8
-quant-factors @ git+https://github.com/PureSaber/quant-factors.git@e5da58606081d9f733cdb0fec96ca408003b4e41
-quant-agent @ git+https://github.com/PureSaber/quant-agent.git@c8a87c3617ab85152468759b6a673dad3c6297bc
-a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@48bdf2bbc04c2b771f5d5938323196cab4e861f1
+quant-factors @ git+https://github.com/PureSaber/quant-factors.git@313243588a0ea090a399244eccbc8e1833119b3a
+quant-agent @ git+https://github.com/PureSaber/quant-agent.git@8914ca6082a01fcc817e59bbb11ae479f7d6a65d
+a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@3143574dab54e339b57a3c6a51b89befc24f385a
 quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@ab1300c996f8b39f24a6002128bcc194b12d65da
 quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1
