@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from quant_pipeline.daily import _input_request, run_daily
+from quant_pipeline.daily import _input_request, build_notification, run_daily
 
 
 def test_failed_refresh_invalidates_old_pointer_and_still_renders(tmp_path, monkeypatch):
@@ -58,6 +58,9 @@ def test_success_account_and_report_share_exact_run(tmp_path, monkeypatch):
     def fake(command, **kwargs):
         calls.append(command)
         if "a_share_multifactor.decision_workflow" in command:
+            (tmp_path / "decision.json").write_text(
+                json.dumps({"status": "observe", "reasons": []})
+            )
             (tmp_path / "runs/latest.json").write_text(
                 json.dumps({"status": "observe", "decision": str(tmp_path / "decision.json")})
             )
@@ -100,6 +103,9 @@ def test_data_policy_builds_inputs_before_research_without_leaking_provider_deta
     def fake(command, **kwargs):
         calls.append(command)
         if "a_share_multifactor.decision_workflow" in command:
+            (tmp_path / "decision.json").write_text(
+                json.dumps({"status": "observe", "reasons": []})
+            )
             (tmp_path / "runs/latest.json").write_text(
                 json.dumps({"status": "observe", "decision": str(tmp_path / "decision.json")})
             )
@@ -137,3 +143,62 @@ def test_input_request_uses_decision_watchlist_and_history(tmp_path):
         datetime(2026, 9, 20, tzinfo=timezone.utc),
     )
     assert request == {"symbols": ["000001"], "start": "2026-09-13", "end": "2026-09-18"}
+
+
+def test_notification_is_quiet_until_action_is_required():
+    quiet = build_notification(
+        {"invocation": "one", "status": "completed", "decision_status": "paper_ready"},
+        {"reasons": []},
+        [{"severity": "info", "message": "forward evidence is still maturing"}],
+    )
+    assert quiet["notify"] is False
+    assert quiet["severity"] == "none"
+
+    blocked = build_notification(
+        {"invocation": "two", "status": "failed", "decision_status": "blocked"},
+        {"reasons": ["stale trading-status snapshot"]},
+        [],
+    )
+    assert blocked["notify"] is True
+    assert blocked["severity"] == "critical"
+    assert "stale trading-status snapshot" in blocked["reasons"]
+
+
+def test_configured_alert_sidecar_is_part_of_completion_contract(tmp_path, monkeypatch):
+    config = tmp_path / "daily.yaml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "root": ".",
+                "output": "runs",
+                "decision_config": "decision.yaml",
+                "report_command": ["-m", "report"],
+                "alerts_file": "{output}/dashboard.alerts.json",
+            }
+        )
+    )
+
+    def fake(command, **kwargs):
+        if "a_share_multifactor.decision_workflow" in command:
+            decision = tmp_path / "decision.json"
+            decision.write_text(json.dumps({"status": "paper_ready", "reasons": []}))
+            (tmp_path / "runs/latest.json").write_text(
+                json.dumps({"status": "paper_ready", "decision": str(decision)})
+            )
+        if command[-2:] == ["-m", "report"]:
+            (tmp_path / "runs/dashboard.alerts.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "quant-report-hub.alerts/v1",
+                        "alerts": [{"severity": "warning", "message": "review turnover"}],
+                    }
+                )
+            )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake)
+    result = run_daily(config, inputs=tmp_path / "inputs")
+    assert result["status"] == "completed"
+    notification = json.loads((tmp_path / "runs/notification-latest.json").read_text())
+    assert notification["notify"] is True
+    assert notification["severity"] == "warning"
