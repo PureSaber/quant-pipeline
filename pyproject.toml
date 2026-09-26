@@ -20,7 +20,7 @@ dependencies = [
 workspace = []
 research = [
     "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@a909752bc3666da7de092308b37936dfa18ee764",
-    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@5226ee9a7c7aaecbef43e96467d4fc3455fcc462",
+    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@4c351b62404643c1cf01a9ca141f48ffee0b76a4",
 ]
 dev = [
     "pytest>=9.0,<10",
