@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 workspace = []
 research = [
-    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@ad40a8a26ab5c238f99a1cdbbd1386ff190b1132",
+    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@a909752bc3666da7de092308b37936dfa18ee764",
     "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@30bac2b595b2312333f7bdac3bf156c1327bf2f9",
 ]
 dev = [
