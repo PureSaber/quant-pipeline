@@ -11,11 +11,17 @@ license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
+    "quant-lab @ git+https://github.com/PureSaber/quant-lab.git@bace19c01cf3ecd77fbbb4a5bc75f2ce3498902f",
+    "quant-factors @ git+https://github.com/PureSaber/quant-factors.git@ba021bbe11696f0bd5cda0ee047515793f11855d",
     "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1",
 ]
 
 [project.optional-dependencies]
 workspace = []
+research = [
+    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@ad40a8a26ab5c238f99a1cdbbd1386ff190b1132",
+    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@30bac2b595b2312333f7bdac3bf156c1327bf2f9",
+]
 dev = [
     "pytest>=9.0,<10",
     "pytest-cov>=7.0,<8",
@@ -25,6 +31,7 @@ dev = [
 
 [project.scripts]
 quant-pipe = "quant_pipeline.cli:main"
+quant-research = "quant_pipeline.research_workbench:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
