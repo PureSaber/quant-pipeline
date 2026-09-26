@@ -181,15 +181,94 @@ def load_account(root: Path) -> dict:
     return account
 
 
+def _instrument_master_prefix(
+    inputs: dict,
+    cutoff: str,
+    manifest: dict,
+) -> tuple[dict | None, set[str]]:
+    """Return a semantic prefix only for a fully verified QDK master projection."""
+    from a_share_multifactor.run_contract import _canonical_frame_sha256
+    from quant_data_kit.instrument_master import (
+        BUNDLE_SCHEMA,
+        instrument_master_prefix,
+        load_instrument_master,
+        resolve_instrument_catalog,
+    )
+
+    files = manifest.get("files", {})
+    master_frames = {
+        name
+        for name, item in files.items()
+        if isinstance(item, dict) and item.get("provider") == BUNDLE_SCHEMA
+    }
+    if not master_frames:
+        return None, set()
+    if master_frames != {"catalog"} or manifest.get("schema_version") != "qdk.research-dataset/v1":
+        raise ValueError("Unsupported verified instrument-master projection")
+
+    snapshot_identity = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"snapshot_id", "identity_sha256"}
+    }
+    snapshot_sha256 = digest(snapshot_identity)
+    if (
+        manifest.get("identity_sha256") != snapshot_sha256
+        or manifest.get("snapshot_id") != f"sha256-{snapshot_sha256}"
+    ):
+        raise ValueError("Instrument-master dataset snapshot identity changed")
+
+    bundle = Path(inputs["bundle"]).resolve()
+    item = files["catalog"]
+    projected_catalog = (bundle / item["file"]).resolve()
+    try:
+        projected_catalog.relative_to(bundle)
+    except ValueError as exc:
+        raise ValueError("Instrument-master catalog projection escapes the bundle") from exc
+    if projected_catalog != Path(inputs["catalog"]).resolve():
+        raise ValueError("Recipe catalog is not the verified instrument-master projection")
+    if file_hash(projected_catalog) != item.get("sha256"):
+        raise ValueError("Instrument-master catalog projection hash changed")
+
+    master_root = bundle / "instrument_master"
+    master_manifest, versioned_catalog = load_instrument_master(master_root)
+    validation = manifest.get("validation", {}).get("instrument_master", {})
+    if (
+        validation.get("passed") is not True
+        or validation.get("bundle_sha256") != master_manifest["bundle_sha256"]
+    ):
+        raise ValueError("Dataset does not bind the verified instrument-master identity")
+    expected = resolve_instrument_catalog(
+        versioned_catalog,
+        symbols=[str(symbol) for symbol in manifest["symbols"]],
+        start=pd.Timestamp(manifest["requested_start"]),
+        end=pd.Timestamp(manifest["requested_end"]),
+    )
+    actual = pd.read_csv(projected_catalog, dtype=str, keep_default_na=False)
+    if _canonical_frame_sha256(actual) != _canonical_frame_sha256(expected):
+        raise ValueError("Instrument-master catalog projection differs from verified evidence")
+
+    cutoff_close = pd.Timestamp(cutoff).tz_localize("Asia/Shanghai") + pd.Timedelta(hours=15)
+    prefix = instrument_master_prefix(master_root, cutoff=cutoff_close)
+    return {
+        "kind": "verified-instrument-master-prefix",
+        "value": prefix,
+    }, master_frames
+
+
 def input_prefix(inputs: dict, cutoff: str) -> dict:
     """Hash all observations known on/before cutoff to reject historical revisions."""
     from a_share_multifactor.decision_workflow import load_inputs
     from a_share_multifactor.run_contract import _canonical_frame_sha256
     from quant_data_kit.research_coverage import load_history
 
-    _, frames = load_inputs(Path(inputs["bundle"]))
+    manifest, frames = load_inputs(Path(inputs["bundle"]))
+    master_prefix, master_frames = _instrument_master_prefix(inputs, cutoff, manifest)
     identity = {}
     for name, frame in frames.items():
+        if name in master_frames:
+            identity[name] = master_prefix
+            continue
         if "date" in frame:
             frame = frame[pd.to_datetime(frame.date) <= pd.Timestamp(cutoff)]
         elif "available_at" in frame:
@@ -198,7 +277,7 @@ def input_prefix(inputs: dict, cutoff: str) -> dict:
         elif "announced_date" in frame:
             frame = frame[pd.to_datetime(frame.announced_date) <= pd.Timestamp(cutoff)]
         identity[name] = _canonical_frame_sha256(frame)
-    identity["catalog"] = file_hash(Path(inputs["catalog"]))
+    identity["catalog"] = master_prefix or file_hash(Path(inputs["catalog"]))
     if "history" in inputs:
         _, history = load_history(Path(inputs["history"]))
         close = pd.Timestamp(cutoff).tz_localize("Asia/Shanghai") + pd.Timedelta(hours=15)
