@@ -47,7 +47,7 @@ def input_identity(recipe: dict) -> dict:
             )
             for name, item in entries.items():
                 target = (path / item["file"]).resolve()
-                if target.parent != path.resolve() or file_hash(target) != item["sha256"]:
+                if path.resolve() not in target.parents or file_hash(target) != item["sha256"]:
                     raise ValueError(f"Input integrity failure: {key}/{name}")
                 evidence[key][name] = item["sha256"]
         else:

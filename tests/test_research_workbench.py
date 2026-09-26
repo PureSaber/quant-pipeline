@@ -27,6 +27,27 @@ def test_demo_data_is_explicitly_synthetic_and_hashes_verified(tmp_path):
         create_demo(tmp_path / "invalid", asset="unknown")
 
 
+def test_input_identity_verifies_nested_snapshot_files_and_rejects_escape(tmp_path):
+    from quant_lab.research import file_hash, load_recipe
+
+    recipe = load_recipe(create_demo(tmp_path / "nested"))
+    bundle = Path(recipe["inputs"]["bundle"])
+    nested = bundle / "history" / "history.parquet"
+    nested.parent.mkdir()
+    nested.write_bytes(b"hash-only fixture")
+    manifest = bundle / "manifest.json"
+    payload = json.loads(manifest.read_text())
+    payload["files"]["history"] = {"file": "history/history.parquet", "sha256": file_hash(nested)}
+    manifest.write_text(json.dumps(payload))
+    assert input_identity(recipe)["bundle"]["history"] == file_hash(nested)
+    outside = bundle.parent / "outside.parquet"
+    outside.write_bytes(nested.read_bytes())
+    payload["files"]["history"]["file"] = "../outside.parquet"
+    manifest.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="integrity"):
+        input_identity(recipe)
+
+
 def test_frozen_backend_errors_preserve_log_and_reject_unsupported_variants(tmp_path, monkeypatch):
     executor = FixtureExecutor(Path(sys.executable))
     candidate = {"cost_multiplier": 2, "signal_delay": 0}
