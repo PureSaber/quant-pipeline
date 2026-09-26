@@ -4,7 +4,7 @@
 
 ## 本机操作台
 
-安装`quant-pipeline[research]`，或使用quant-workspace的research-workbench固定版本环境。从集成目录运行：
+使用quant-workspace的research-workbench固定版本源码环境，以便验证全部仓库的代码身份和干净状态。`research`扩展声明完整应用依赖；仅安装一个脱离源码的wheel不能替代固定源码清单。从集成目录运行：
 
 ```powershell
 python -m quant_pipeline.research_demo --advanced --output demos/advanced

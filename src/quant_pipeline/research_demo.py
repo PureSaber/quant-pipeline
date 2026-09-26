@@ -196,6 +196,8 @@ def create_demo(output: Path, *, asset: str = "etf", advanced: bool = False) -> 
             ],
         )
         recipe["inputs"]["history"] = "history"
+        # Leave capacity for non-equal weights so allocation comparisons are meaningful.
+        recipe["strategy"]["max_weight"] = 0.35
     path = output / "recipe.yaml"
     path.write_text(yaml.safe_dump(recipe, sort_keys=False), encoding="utf-8")
     return path
