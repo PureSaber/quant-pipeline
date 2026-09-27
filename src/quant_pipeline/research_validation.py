@@ -178,11 +178,30 @@ class WalkForwardExecutor:
         }
 
 
-def paired_bootstrap(values, *, seed=17, repetitions=1000):
+def paired_bootstrap(values, *, seed=17, repetitions=1000, method="circular", block_lengths=None):
     """Moving-block bootstrap of paired daily excess return; no IID daily claim."""
     values = np.asarray(values, dtype=float)
     if len(values) < 10 or not np.isfinite(values).all():
         return {"available": False, "reason": "fewer than 10 finite paired sessions"}
+    if method == "stationary" or block_lengths is not None:
+        from quant_lab.selection import bootstrap_means, hac_mean
+
+        lengths = block_lengths or [max(2, int(np.sqrt(len(values))))]
+        data = pd.DataFrame(
+            {"excess": values}, index=pd.date_range("2000-01-01", periods=len(values))
+        )
+        result = bootstrap_means(
+            data, block_lengths=lengths, repetitions=repetitions, seed=seed, method=method
+        )
+        return {
+            "available": True,
+            "mean_daily_excess": float(values.mean()),
+            "dependence_sensitivity": result,
+            "hac": hac_mean(values, lags=min(max(lengths), len(values) - 1)),
+            "policy": "all block results shown; no significance-based block selection",
+        }
+    if method != "circular":
+        raise ValueError("method must be circular or stationary")
     block = max(2, int(np.sqrt(len(values))))
     rng = np.random.default_rng(seed)
     offsets = np.arange(block)
@@ -246,8 +265,10 @@ def summarize_validation(summary: dict) -> dict:
                     "test_metrics": record["test_metrics"],
                 }
             )
-        if result["selection_complete"]:
+        if result["selection_complete"] and settings["account_policy"] == "independent":
             result["selected_oos_metrics"] = return_metrics(pd.Series(chosen_returns))
+        elif result["selection_complete"]:
+            result["selected_path_requires_replay"] = True
     benchmark = results.get("buy_hold")
     if benchmark:
         baseline = {
@@ -281,8 +302,10 @@ def summarize_validation(summary: dict) -> dict:
     return result
 
 
-def write_validation_report(summary: dict, output: Path) -> dict:
+def write_validation_report(summary: dict, output: Path, *, selected_path=None) -> dict:
     result = summarize_validation(summary)
+    if selected_path is not None:
+        result["selected_continuous_path"] = selected_path
     result["study_sha256"] = file_hash(output / "study.json")
     (output / "validation.json").write_text(canonical(result), encoding="utf-8")
     rows = "".join(
@@ -297,7 +320,7 @@ def write_validation_report(summary: dict, output: Path) -> dict:
         "background:#f4f6fa;color:#172b43}td,th{padding:12px;border-bottom:1px solid #ccd} "
         "pre{white-space:pre-wrap;background:white;padding:20px}</style>"
         f"<h1>{escape(summary['study_id'])} · 样本外验证</h1>"
-        "<p>每折仅按训练结果选择候选；测试区间不参与本折选择。每折账户从现金重新开始，计入入场费用。</p>"
+        f"<p>每折仅按训练结果选择候选；测试区间不参与本折选择。账户模式：{escape(result['settings']['account_policy'])}。</p>"
         "<p>滚动样本外结果属于历史研究；不等同于未触碰的前向观察。</p>"
         f"<p>选择完整：{result['selection_complete']}；全部候选完成：{result['all_candidates_completed']}</p>"
         "<table><tr><th>折</th><th>训练所选候选</th><th>训练区间</th><th>测试区间</th><th>测试收益</th></tr>"
