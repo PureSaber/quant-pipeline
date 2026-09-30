@@ -149,7 +149,15 @@ submission.
 
 本机操作台、自动滚动样本外验证、限定因子表达式、当前NAV组合配置、动态交易状态、前向模拟账户和历史研究助手已接入。使用quant-workspace提供的固定源码集成环境，完整命令与验收边界见[工作台指南](docs/research-workbench-v2.md)。
 
-CI的`requirements-research.lock`固定完整研究依赖，沿用quant-workspace审计过的公共包版本，应用依赖固定到Git提交；安装后运行`pip check`。`requirements.lock`保留基础编排环境。扩展依赖变化时，两份声明/锁与工作台stack.json一并更新。
+CI的`requirements-research.lock`固定完整研究依赖，应用依赖固定到Git提交；安装后运行`pip check`。`requirements.lock`保留基础编排环境。基础或研究依赖变化时，必须更新对应声明与锁；测试会核验`requirements-research.in`中的版本约束和直接下载地址是否进入研究锁。用Python3.10重建研究锁：
+
+```bash
+python -m piptools compile --extra dev --extra research --build-deps-for editable \
+  --allow-unsafe --strip-extras --index-url https://pypi.org/simple \
+  --constraint requirements-research.in --output-file requirements-research.lock pyproject.toml
+```
+
+quant-workspace的`stack.json`与公共依赖锁共同定义独立的集成快照。更新该快照时，应在集成PR中一起修改并通过跨仓验收；单仓依赖升级不会自动修改冻结研究环境。
 
 ## 研究可信度 11–20
 
