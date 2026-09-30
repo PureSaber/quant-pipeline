@@ -95,4 +95,3 @@ python -m quant_pipeline.research_paper seal accounts/forward-01
 wheel 必须带有 `direct_url.json` 的 Git 提交来源，包文件逐一匹配安装 `RECORD` 的
 SHA-256；缺少来源、修改文件或新增文件均阻断执行。普通版本号不能代替不可变身份。
 可用 quant-workspace 的 `profiles/research-workbench/bootstrap.py` 创建独立源码环境。
-

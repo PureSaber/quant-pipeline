@@ -21,6 +21,51 @@ class ContinuousFake(FakeLedger):
         return self(recipe, selections[0]["candidate"], out)
 
 
+@pytest.mark.parametrize("delay", [0, 1])
+@pytest.mark.parametrize("mutation", [None, "missing_delay", "representation", "neutralization"])
+def test_continuous_direction_uses_executed_neutralized_signal(tmp_path, delay, mutation):
+    recipe, dates = setup_recipe(tmp_path)
+    recipe["validation"].update(account_policy="continuous", direction_policy="train_ic")
+    recipe["neutralization"] = ["industry"]
+    recipe["required_history"] = {"industry": "classification"}
+    candidate = candidates(recipe)[0]
+    candidate["signal_delay"] = delay
+
+    class Ledger(ContinuousFake):
+        def __call__(self, recipe, selected, out):
+            result = super().__call__(recipe, selected, out)
+            evidence = result["factor_evidence"]
+            evidence["neutralization"] = [
+                {
+                    "factor": name,
+                    "horizon": 1,
+                    "sessions": 3,
+                    "applied_by": ["industry"] if mutation != "neutralization" else [],
+                    "neutralized_rank_ic": 0.5,
+                }
+                for name in selected["factors"]
+            ]
+            if mutation == "missing_delay":
+                evidence.pop("signal_delay")
+            if mutation == "representation":
+                evidence["signal_representation"] = "unrelated-signal"
+            return result
+
+    output = tmp_path / "candidate"
+    output.mkdir()
+    executor = ContinuousWalkForwardExecutor(Ledger(dates), dates)
+    if mutation:
+        with pytest.raises(ValueError, match="Training"):
+            executor(recipe, candidate, output)
+        assert not (output / "continuous").exists()
+    else:
+        result = executor(recipe, candidate, output)
+        assert all(
+            set(fold["candidate"]["factors"].values()) == {1}
+            for fold in result["validation"]["folds"]
+        )
+
+
 def test_training_updates_feed_one_account_and_selected_path_is_replayed_and_verified(tmp_path):
     recipe, dates = setup_recipe(tmp_path)
     recipe["validation"].update(account_policy="continuous", direction_policy="train_ic")
