@@ -1,5 +1,8 @@
 import json
+import multiprocessing
 from copy import deepcopy
+from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -9,6 +12,67 @@ from test_walk_forward_research import setup_recipe
 
 from quant_pipeline.continuous_validation import ContinuousWalkForwardExecutor, replay_selected_path
 from quant_pipeline.research_validation import summarize_validation
+
+
+def _paused_replay(summary, validation, dates, output, stage, ready, release, results):
+    """Run in a separate process; pause only to make the race deterministic."""
+    original_exists, original_rename = Path.exists, Path.rename
+
+    def exists(path):
+        answer = original_exists(path)
+        if stage == "checked" and path == output / "selected-path.json":
+            ready.set()
+            if not release.wait(30):
+                raise TimeoutError("test did not release cache check")
+        return answer
+
+    def rename(path, target):
+        result = original_rename(path, target)
+        if stage == "published" and target == output:
+            ready.set()
+            if not release.wait(30):
+                raise TimeoutError("test did not release publication")
+        return result
+
+    try:
+        with patch.object(Path, "exists", exists), patch.object(Path, "rename", rename):
+            result = replay_selected_path(summary, validation, ContinuousFake(dates), output)
+        results.put({"available": result["available"]})
+    except (OSError, ValueError, RuntimeError, AssertionError) as exc:
+        results.put({"error": repr(exc)})
+
+
+@pytest.mark.parametrize("stage", ["checked", "published"])
+def test_concurrent_replay_cannot_move_or_replace_completed_output(study, tmp_path, stage):
+    summary, validation, ledger = study
+    output = tmp_path / "selected"
+    context = multiprocessing.get_context("spawn")
+    ready, release, results = context.Event(), context.Event(), context.Queue()
+    process = context.Process(
+        target=_paused_replay,
+        args=(summary, validation, ledger.dates, output, stage, ready, release, results),
+    )
+    process.start()
+    calls = len(ledger.calls)
+    try:
+        assert ready.wait(20), "worker did not reach the race window"
+        # A competing process fails closed without touching the active output.
+        with pytest.raises(OSError):
+            replay_selected_path(summary, validation, ledger, output)
+        assert len(ledger.calls) == calls
+    finally:
+        release.set()
+        process.join(timeout=30)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=10)
+    assert process.exitcode == 0
+    assert results.get(timeout=5) == {"available": True}
+    cached = output / "selected-path.json"
+    before = cached.read_bytes()
+    assert replay_selected_path(summary, validation, ledger, output)["available"]
+    assert cached.read_bytes() == before and len(ledger.calls) == calls
+    assert not list(tmp_path.glob("selected-interrupted-*"))
 
 
 @pytest.fixture

@@ -35,6 +35,9 @@ Failed attempts remain in sibling `selected-continuous-attempt-*` directories wi
 an interrupted legacy directory without its final summary is preserved before retry. Completed
 legacy caches without the new integrity record fail closed: rerun in a new study output directory,
 leaving the old evidence intact. Upstream training and execution limitations are retained.
+The cache check, recovery, execution and publication share a cross-process lock in a stable
+sibling directory. A competing invocation exits with a lock error and can be retried after the
+active run finishes; it never archives or replaces the active/completed output.
 
 Rebuild the complete runtime, development, and editable-build lock with Python 3.10 so the oldest
 supported interpreter's conditional dependency closure remains explicit:
