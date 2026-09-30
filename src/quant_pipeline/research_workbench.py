@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import subprocess
 import sys
@@ -11,20 +10,15 @@ from pathlib import Path
 
 from quant_lab.research import canonical, digest, execute_study, file_hash, load_recipe
 
+from quant_pipeline.code_identity import package_revision
+
 
 def code_identity() -> dict:
-    """Record actual clean source revisions; no floating version labels."""
-    revisions = {}
-    for name in ("quant_pipeline", "quant_lab", "quant_data_kit", "quant_factors"):
-        module = importlib.import_module(name)
-        root = Path(module.__file__).resolve().parents[2]
-        status = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)
-        if status.strip():
-            raise ValueError(f"Research execution requires a clean {name} checkout")
-        revisions[name] = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=root, text=True
-        ).strip()
-    return revisions
+    """Record actual clean source or verified installed VCS revisions."""
+    return {
+        name: package_revision(name)
+        for name in ("quant_pipeline", "quant_lab", "quant_data_kit", "quant_factors")
+    }
 
 
 def input_identity(recipe: dict) -> dict:

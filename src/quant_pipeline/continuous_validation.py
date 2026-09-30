@@ -9,7 +9,7 @@ from quant_factors.validation import walk_forward_splits
 from quant_lab.research import canonical, digest, file_hash
 from quant_lab.research_options import validate_validation
 
-from quant_pipeline.research_validation import return_metrics
+from quant_pipeline.research_validation import return_metrics, training_directions
 
 
 class ContinuousWalkForwardExecutor:
@@ -46,17 +46,9 @@ class ContinuousWalkForwardExecutor:
             folder.mkdir()
             result = self.executor(train, selected, folder)
             if settings["direction_policy"] == "train_ic" and candidate["name"] != "buy_hold":
-                evidence = {
-                    r["factor"]: r
-                    for r in result["factor_evidence"]["ic_decay"]
-                    if r["horizon"] == settings["direction_horizon"]
-                }
-                for name in selected["factors"]:
-                    row = evidence.get(name, {})
-                    value = row.get("rank_ic")
-                    if value is None or not np.isfinite(value) or row.get("sessions", 0) < 2:
-                        raise ValueError("insufficient mature training evidence for direction")
-                    selected["factors"][name] = 1 if value >= 0 else -1
+                selected["factors"] = training_directions(
+                    recipe, candidate, settings, result.get("factor_evidence")
+                )
                 if selected != candidate:
                     folder = output / f"train-selected-{split.fold:03d}"
                     folder.mkdir()
