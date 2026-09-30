@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import subprocess
 import sys
@@ -11,20 +10,15 @@ from pathlib import Path
 
 from quant_lab.research import canonical, digest, execute_study, file_hash, load_recipe
 
+from quant_pipeline.code_identity import package_revision
+
 
 def code_identity() -> dict:
-    """Record actual clean source revisions; no floating version labels."""
-    revisions = {}
-    for name in ("quant_pipeline", "quant_lab", "quant_data_kit", "quant_factors"):
-        module = importlib.import_module(name)
-        root = Path(module.__file__).resolve().parents[2]
-        status = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)
-        if status.strip():
-            raise ValueError(f"Research execution requires a clean {name} checkout")
-        revisions[name] = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=root, text=True
-        ).strip()
-    return revisions
+    """Record actual clean source or verified installed VCS revisions."""
+    return {
+        name: package_revision(name)
+        for name in ("quant_pipeline", "quant_lab", "quant_data_kit", "quant_factors")
+    }
 
 
 def input_identity(recipe: dict) -> dict:
@@ -112,6 +106,7 @@ def run_research(
     *,
     fixture_python: Path | None = None,
     expected_recipe_sha256: str | None = None,
+    registry_path: Path | None = None,
 ) -> dict:
     recipe = load_recipe(recipe_path)
     if expected_recipe_sha256 is not None and digest(recipe) != expected_recipe_sha256:
@@ -123,13 +118,19 @@ def run_research(
 
         identity = equity_code_identity()
         executor = EquityResearchExecutor()
+        equity_executor = executor
         if recipe.get("validation"):
             from a_share_multifactor.decision_workflow import load_inputs
 
             from quant_pipeline.research_validation import WalkForwardExecutor
 
             _, frames = load_inputs(Path(recipe["inputs"]["bundle"]))
-            executor = WalkForwardExecutor(executor, frames["calendar"]["date"])
+            if recipe["validation"].get("account_policy", "independent") == "continuous":
+                from quant_pipeline.continuous_validation import ContinuousWalkForwardExecutor
+
+                executor = ContinuousWalkForwardExecutor(executor, frames["calendar"]["date"])
+            else:
+                executor = WalkForwardExecutor(executor, frames["calendar"]["date"])
     else:
         if fixture_python is None:
             raise ValueError(
@@ -137,14 +138,34 @@ def run_research(
             )
         executor = FixtureExecutor(fixture_python)
         identity["fixture_runtime"] = executor.inspect(recipe["backend"])
-    result = execute_study(recipe, output, identity=identity, data_identity=data, executor=executor)
+    from quant_lab.trials import TrialRegistry
+
+    result = execute_study(
+        recipe,
+        output,
+        identity=identity,
+        data_identity=data,
+        executor=executor,
+        registry=TrialRegistry(registry_path) if registry_path else None,
+    )
     from quant_report_hub.research_workbench import render_study
 
-    render_study(output / "study.json", output / "research.html")
+    render_study(output / "study.json", output / "research.html", registry_path=registry_path)
     if recipe.get("validation"):
         from quant_pipeline.research_validation import write_validation_report
 
-        write_validation_report(result, output)
+        selected_path = None
+        if recipe["validation"].get("account_policy", "independent") == "continuous":
+            from quant_pipeline.continuous_validation import replay_selected_path
+            from quant_pipeline.research_validation import summarize_validation
+
+            selected_path = replay_selected_path(
+                result,
+                summarize_validation(result),
+                equity_executor,
+                output / "selected-continuous",
+            )
+        write_validation_report(result, output, selected_path=selected_path)
     return result
 
 
@@ -154,12 +175,14 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--fixture-python", type=Path)
     parser.add_argument("--expected-recipe-sha256")
+    parser.add_argument("--registry", type=Path)
     args = parser.parse_args()
     result = run_research(
         args.recipe,
         args.output,
         fixture_python=args.fixture_python,
         expected_recipe_sha256=args.expected_recipe_sha256,
+        registry_path=args.registry,
     )
     print(
         json.dumps(

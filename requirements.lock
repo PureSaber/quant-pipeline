@@ -4,6 +4,8 @@
 #
 #    pip-compile --allow-unsafe --build-deps-for=editable --extra=dev --index-url=https://pypi.org/simple --no-index --output-file=requirements.lock --strip-extras pyproject.toml
 #
+arch==8.0.0
+    # via quant-pipeline (pyproject.toml)
 attrs==26.1.0
     # via
     #   jsonschema
@@ -26,21 +28,33 @@ jsonschema-specifications==2025.9.1
     # via jsonschema
 numpy==2.2.6
     # via
+    #   arch
     #   pandas
+    #   patsy
     #   quant-data-kit
     #   quant-factors
     #   quant-lab
+    #   scipy
+    #   statsmodels
 orjson==3.12.0
     # via quant-data-kit
 packaging==26.3
     # via
+    #   arch
+    #   patsy
     #   pytest
     #   quant-workspace
+    #   statsmodels
+    #   wheel
 pandas==2.3.3
     # via
+    #   arch
     #   quant-data-kit
     #   quant-factors
     #   quant-lab
+    #   statsmodels
+patsy==1.0.3
+    # via statsmodels
 pluggy==1.6.0
     # via
     #   pytest
@@ -69,11 +83,11 @@ pyyaml==6.0.3
     #   quant-lab
     #   quant-pipeline (pyproject.toml)
     #   quant-workspace
-quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@b5621379e1a15562371be31c03f354a6acf512e4
+quant-data-kit @ git+https://github.com/PureSaber/quant-data-kit.git@ba136c2fa2eea121bfb2ad7887b536c3952586f7
     # via quant-factors
-quant-factors @ git+https://github.com/PureSaber/quant-factors.git@482e184b4b9b66b47c7528b6cc01cf3077ce78d3
+quant-factors @ git+https://github.com/PureSaber/quant-factors.git@249fb621d4d880942cb5dfbbcd812c0d45bf45a2
     # via quant-pipeline (pyproject.toml)
-quant-lab @ git+https://github.com/PureSaber/quant-lab.git@6ad789442a5ff7b5e3f68d241ecf0ee327f7e82f
+quant-lab @ git+https://github.com/PureSaber/quant-lab.git@a923a791315312a4d9caecf3b9776f08d53bb736
     # via quant-pipeline (pyproject.toml)
 quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1
     # via quant-pipeline (pyproject.toml)
@@ -87,8 +101,14 @@ rpds-py==0.30.0
     #   referencing
 ruff==0.16.5
     # via quant-pipeline (pyproject.toml)
+scipy==1.15.3
+    # via
+    #   arch
+    #   statsmodels
 six==1.17.0
     # via python-dateutil
+statsmodels==0.14.6
+    # via arch
 tomli==2.4.1 ; python_version < "3.11"
     # via
     #   coverage
@@ -104,7 +124,11 @@ tzdata==2026.4
     # via pandas
 websockets==15.0.1
     # via quant-data-kit
+wheel==0.48.0
+    # via quant-pipeline (pyproject.toml)
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==84.0.0
-    # via quant-pipeline (pyproject.toml::build-system.requires)
+    # via
+    #   quant-pipeline (pyproject.toml)
+    #   quant-pipeline (pyproject.toml::build-system.requires)

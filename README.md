@@ -1,5 +1,7 @@
 # quant-pipeline
 
+研究可信度升级：接口、使用示例、验收及限制见 [11–20 使用说明](docs/RESEARCH_INTEGRITY_11_20.md)。
+
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the
 PureSaber quant stack. Version 0.4.0 retains the typed `schema_version: "2.0.0"` DAG and adds a
 quiet-by-default close-of-day notification contract. Generated full/core coverage evidence is
@@ -130,3 +132,10 @@ submission.
 本机操作台、自动滚动样本外验证、限定因子表达式、当前NAV组合配置、动态交易状态、前向模拟账户和历史研究助手已接入。使用quant-workspace提供的固定源码集成环境，完整命令与验收边界见[工作台指南](docs/research-workbench-v2.md)。
 
 CI的`requirements-research.lock`固定完整研究依赖，沿用quant-workspace审计过的公共包版本，应用依赖固定到Git提交；安装后运行`pip check`。`requirements.lock`保留基础编排环境。扩展依赖变化时，两份声明/锁与工作台stack.json一并更新。
+
+## 研究可信度 11–20
+
+新增跨研究家族 DSR/CSCV/SPA/MCS 入口、依赖 bootstrap/HAC，以及训练期决定参数的连续样本外账户。
+`account_policy` 默认仍为 `independent`；连续账户需显式选择，且不能拼接独立资金账户来冒充连续选择路径。
+本批联合锁文件保留报告端的固定公共包约束，并增加经验证的 arch/statsmodels 组合与新应用提交。
+使用方法、锁文件重建、嵌套验证入口及限制见 [研究可信度指南](docs/RESEARCH_INTEGRITY_11_20.md)。

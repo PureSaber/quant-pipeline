@@ -89,3 +89,10 @@ python -m quant_pipeline.research_paper seal accounts/forward-01
 ## 有据研究助手
 
 `quant_agent.research_history`读取成功和失败研究，核验引用文件与哈希，输出相似研究、最小对照、缺失数据及边界。操作台直接调用同一入口。助手不会自动运行建议、改动费用/区间/留出，或把缺失来源包装成证据。离线检索可直接使用；在线模型需另行配置并明确启用，默认不发送研究文本。
+# 安装后的代码身份
+
+研究执行支持干净、已跟踪的源码检出，以及从精确 40 位 Git 提交安装的 wheel。
+wheel 必须带有 `direct_url.json` 的 Git 提交来源，包文件逐一匹配安装 `RECORD` 的
+SHA-256；缺少来源、修改文件或新增文件均阻断执行。普通版本号不能代替不可变身份。
+可用 quant-workspace 的 `profiles/research-workbench/bootstrap.py` 创建独立源码环境。
+
