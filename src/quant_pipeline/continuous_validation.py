@@ -10,7 +10,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from quant_factors.validation import walk_forward_splits
-from quant_lab.research import canonical, digest, file_hash
+from quant_lab.research import canonical, digest, file_hash, study_lock
 from quant_lab.research_options import validate_validation
 
 from quant_pipeline.research_validation import return_metrics, training_directions
@@ -136,6 +136,13 @@ def replay_selected_path(summary, validation, executor, output):
         {"recipe": recipe, "decisions": decisions, "definition": summary["definition_sha256"]}
     )
     output = Path(output)
+    # The lock is a stable sibling: never move it when preserving an interrupted
+    # output, and hold it across the cache check, execution and final publication.
+    with study_lock(output.parent / f".{output.name}-lock"):
+        return _replay_locked(recipe, decisions, expected_dates, request_sha, executor, output)
+
+
+def _replay_locked(recipe, decisions, expected_dates, request_sha, executor, output):
     if output.is_symlink():
         raise ValueError("continuous selected path must not be a symlink")
     cached = output / "selected-path.json"
