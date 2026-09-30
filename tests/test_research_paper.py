@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -54,6 +56,398 @@ def ledger(recipe, candidate, output):
     returns = pd.Series([0.0] + [0.01] * (len(dates) - 1), index=dates)
     returns.to_csv(output / "returns.csv", header=["net_return"])
     return {"metrics": return_metrics(returns), "scope": "synthetic-test"}
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_master_source(
+    root: Path,
+    *,
+    captured_at: str,
+    price_tick: str = "0.001",
+    available_at: str = "2022-12-01T00:00:00Z",
+    rule_payload: bytes = b"official rule evidence",
+) -> Path:
+    from quant_data_kit.instrument_master import (
+        CATALOG_SCHEMA,
+        CURRENT_VALIDITY,
+        MASTER_SCOPE,
+        SOURCE_SCHEMA,
+        UNAVAILABLE_FEE_SCOPE,
+    )
+
+    root.mkdir()
+    documents = root / "documents"
+    documents.mkdir()
+    (documents / "listing.txt").write_bytes(b"official listing evidence")
+    (documents / "rule.txt").write_bytes(rule_payload)
+
+    def claims(**fields: str) -> dict:
+        return {
+            field: {
+                "value": value,
+                "locator": f"fixture:{field}",
+                "excerpt": f"fixture declares {field}={value}",
+                "method": "direct",
+            }
+            for field, value in fields.items()
+        }
+
+    catalog = pd.DataFrame(
+        [
+            {
+                "catalog_schema_version": CATALOG_SCHEMA,
+                "catalog_source_version": "official-test-v1",
+                "symbol": "510300",
+                "asset_class": "etf",
+                "product_type": "etf",
+                "venue": "SSE",
+                "price_scale": "3",
+                "price_tick": price_tick,
+                "quantity_step": "1",
+                "lot_size": "100",
+                "commission_rate": "",
+                "stamp_duty_rate": "",
+                "fee_fields_scope": UNAVAILABLE_FEE_SCOPE,
+                "fee_evidence_id": "",
+                "effective_from": "2023-01-01T00:00:00Z",
+                "effective_to": captured_at,
+                "available_at": available_at,
+                "listing_date": "2012-05-28",
+                "listing_date_basis": "official-published-document",
+                "listing_evidence_id": "listing",
+                "trading_rule_evidence_id": "rule",
+                "price_limit_evidence_id": "rule",
+                "price_limit_rate": "0.10",
+                "master_scope": MASTER_SCOPE,
+            }
+        ]
+    )
+    catalog_path = root / "catalog.csv"
+    catalog.to_csv(catalog_path, index=False)
+    declaration = {
+        "schema_version": SOURCE_SCHEMA,
+        "captured_at": captured_at,
+        "rights_note": "test evidence",
+        "coverage": {"instrument_master": "typed-field-evidence-complete"},
+        "catalog_file": "catalog.csv",
+        "catalog_sha256": _sha256(catalog_path),
+        "documents": [
+            {
+                "document_id": "listing",
+                "kind": "listing",
+                "publisher": "official exchange",
+                "title": "listing notice",
+                "source_uri": "https://exchange.example/listing",
+                "published_at": "2012-05-23T00:00:00Z",
+                "available_at": "2012-05-23T08:00:00Z",
+                "effective_from": "2012-05-28T00:00:00Z",
+                "effective_to": captured_at,
+                "validity_basis": CURRENT_VALIDITY,
+                "availability_basis": "official-page-time",
+                "file": "documents/listing.txt",
+                "sha256": _sha256(documents / "listing.txt"),
+                "assertions": [
+                    {
+                        "symbol": "510300",
+                        "fields": claims(
+                            asset_class="etf",
+                            product_type="etf",
+                            venue="SSE",
+                            listing_date="2012-05-28",
+                        ),
+                    }
+                ],
+            },
+            {
+                "document_id": "rule",
+                "kind": "trading_rule",
+                "publisher": "official exchange",
+                "title": "trading rule",
+                "source_uri": "https://exchange.example/rule",
+                "published_at": "2022-11-30T00:00:00Z",
+                "available_at": available_at,
+                "effective_from": "2023-01-01T00:00:00Z",
+                "effective_to": captured_at,
+                "validity_basis": CURRENT_VALIDITY,
+                "availability_basis": "official-page-time",
+                "file": "documents/rule.txt",
+                "sha256": _sha256(documents / "rule.txt"),
+                "assertions": [
+                    {
+                        "symbol": "510300",
+                        "fields": claims(
+                            venue="SSE",
+                            price_scale="3",
+                            price_tick=price_tick,
+                            quantity_step="1",
+                            lot_size="100",
+                            price_limit_rate="0.10",
+                        ),
+                    }
+                ],
+            },
+        ],
+    }
+    (root / "declaration.json").write_text(
+        json.dumps(declaration, ensure_ascii=False), encoding="utf-8"
+    )
+    return root
+
+
+def _master_inputs(
+    root: Path,
+    *,
+    captured_at: str,
+    last_session: str,
+    price_tick: str = "0.001",
+    available_at: str = "2022-12-01T00:00:00Z",
+    rule_payload: bytes = b"official rule evidence",
+) -> dict[str, str]:
+    from quant_data_kit.instrument_master import (
+        BUNDLE_SCHEMA,
+        import_instrument_master,
+        load_instrument_master,
+        resolve_instrument_catalog,
+    )
+
+    root.mkdir()
+    source = root.parent / f"{root.name}-master-source"
+    master_root = root / "instrument_master"
+    import_instrument_master(
+        _write_master_source(
+            source,
+            captured_at=captured_at,
+            price_tick=price_tick,
+            available_at=available_at,
+            rule_payload=rule_payload,
+        ),
+        master_root,
+    )
+    master_manifest, versioned_catalog = load_instrument_master(master_root)
+    sessions = pd.DatetimeIndex(["2023-05-29", "2023-05-30"])
+    if pd.Timestamp(last_session) > sessions.max():
+        sessions = sessions.append(pd.DatetimeIndex([last_session]))
+    raw = pd.DataFrame(
+        [
+            {
+                "symbol": "510300",
+                "date": session,
+                "open": 3.0,
+                "high": 3.0,
+                "low": 3.0,
+                "close": 3.0,
+                "volume": 1_000_000,
+                "adjustment": "none",
+                "volume_unit": "share",
+                "source": "verified-test",
+            }
+            for session in sessions
+        ]
+    )
+    frames = {
+        "raw": raw,
+        "adjusted": raw.assign(adjustment="qfq"),
+        "benchmark": pd.DataFrame({"date": sessions, "benchmark_return": [0.0] * len(sessions)}),
+        "calendar": pd.DataFrame(
+            {
+                "date": pd.DatetimeIndex(
+                    [
+                        "2023-05-29",
+                        "2023-05-30",
+                        "2023-05-31",
+                        "2023-06-01",
+                        "2023-06-02",
+                        "2023-06-05",
+                    ]
+                )
+            }
+        ),
+    }
+    files = {}
+    for name, frame in frames.items():
+        path = root / f"{name}.parquet"
+        frame.to_parquet(path, index=False)
+        files[name] = {
+            "file": path.name,
+            "sha256": _sha256(path),
+            "provider": "verified-test",
+        }
+    projected = resolve_instrument_catalog(
+        versioned_catalog,
+        symbols=["510300"],
+        start=sessions.min(),
+        end=sessions.max(),
+    )
+    catalog_path = root / "catalog.csv"
+    projected.to_csv(catalog_path, index=False)
+    files["catalog"] = {
+        "file": catalog_path.name,
+        "sha256": _sha256(catalog_path),
+        "provider": BUNDLE_SCHEMA,
+    }
+    definition = {
+        "schema_version": "qdk.research-dataset/v1",
+        "parent_snapshot_id": None,
+        "origin": "verified-test",
+        "captured_at": captured_at,
+        "requested_start": str(sessions.min().date()),
+        "requested_end": str(sessions.max().date()),
+        "symbols": ["510300"],
+        "query": {
+            "symbols": ["510300"],
+            "start": str(sessions.min().date()),
+            "end": str(sessions.max().date()),
+        },
+        "source": {"mode": "verified-test", "provider": "verified-test"},
+        "files": files,
+        "evidence_files": {},
+        "validation": {
+            "instrument_master": {
+                "passed": True,
+                "bundle_sha256": master_manifest["bundle_sha256"],
+            }
+        },
+        "update_evidence": {"mode": "append-only-test"},
+        "warnings": [],
+        "consumer_contract": {},
+    }
+    identity = paper.digest(definition)
+    manifest = {
+        "snapshot_id": f"sha256-{identity}",
+        "identity_sha256": identity,
+        **definition,
+    }
+    (root / "manifest.json").write_text(paper.canonical(manifest), encoding="utf-8")
+    return {"bundle": str(root), "catalog": str(catalog_path)}
+
+
+@pytest.fixture
+def master_account(tmp_path, monkeypatch):
+    import quant_report_hub.research_workbench
+
+    snapshots = tmp_path / "snapshots"
+    snapshots.mkdir()
+    inputs = _master_inputs(
+        snapshots / "initial",
+        captured_at="2023-05-31T00:00:00Z",
+        last_session="2023-05-30",
+    )
+    recipe = load_recipe(create_demo(tmp_path / "template"))
+    recipe["inputs"] = inputs
+    recipe["interval"] = {"start": "2023-05-29", "end": "2023-05-30"}
+    recipe["diagnostics"] = {}
+    candidate = candidates(recipe)[0]
+    summary = {
+        "recipe": recipe,
+        "definition_sha256": "verified-master-study",
+        "results": [
+            {
+                "candidate": candidate,
+                "status": "completed",
+                "identity": {"code": "fixed"},
+                "data_identity": paper.input_identity(recipe),
+                "scope": "synthetic-software-demonstration",
+                "metrics": {"total_return": 0.1},
+            }
+        ],
+    }
+    monkeypatch.setattr(quant_report_hub.research_workbench, "load_study", lambda _: summary)
+    monkeypatch.setattr(paper, "equity_code_identity", lambda: {"code": "fixed"})
+    source = tmp_path / "verified-study.json"
+    source.write_text("source study")
+    account_root = tmp_path / "verified-paper"
+    paper.promote(
+        source,
+        "base",
+        account_root,
+        account_id="verified-forward",
+        start="2023-06-01",
+        end="2023-06-05",
+        now=datetime(2023, 5, 31, tzinfo=timezone.utc),
+    )
+    return account_root, inputs, snapshots
+
+
+def test_verified_master_refresh_and_future_rows_advance_forward_account(
+    master_account, monkeypatch
+):
+    from a_share_multifactor import decision_workflow
+
+    root, initial, snapshots = master_account
+    refreshed = _master_inputs(
+        snapshots / "refreshed",
+        captured_at="2023-06-02T00:00:00Z",
+        last_session="2023-06-01",
+    )
+    cutoff = paper.load_account(root)["definition"]["initial_input_cutoff"]
+    original_load = decision_workflow.load_inputs
+
+    def load_with_catalog(path):
+        manifest, frames = original_load(path)
+        entry = manifest["files"]["catalog"]
+        frames["catalog"] = pd.read_csv(
+            Path(path) / entry["file"], dtype=str, keep_default_na=False
+        )
+        return manifest, frames
+
+    monkeypatch.setattr(decision_workflow, "load_inputs", load_with_catalog)
+    assert paper.input_prefix(initial, cutoff) == paper.input_prefix(refreshed, cutoff)
+    observed = paper.observe(
+        root,
+        refreshed,
+        as_of="2023-06-01",
+        now=datetime(2023, 6, 1, 10, tzinfo=timezone.utc),
+        executor=ledger,
+    )
+    assert observed["as_of"] == "2023-06-01"
+    assert observed["input_prefix"]["catalog"]["kind"] == ("verified-instrument-master-prefix")
+
+
+@pytest.mark.parametrize(
+    ("suffix", "changes"),
+    [
+        ("field", {"price_tick": "0.002"}),
+        ("availability", {"available_at": "2022-12-02T00:00:00Z"}),
+        ("evidence", {"rule_payload": b"rewritten historical evidence"}),
+    ],
+)
+def test_verified_master_rejects_historical_field_availability_and_evidence_revisions(
+    master_account, suffix, changes
+):
+    root, _, snapshots = master_account
+    revised = _master_inputs(
+        snapshots / f"revised-{suffix}",
+        captured_at="2023-06-02T00:00:00Z",
+        last_session="2023-06-01",
+        **changes,
+    )
+    with pytest.raises(ValueError, match="Historical inputs were revised after promotion"):
+        paper.observe(
+            root,
+            revised,
+            as_of="2023-06-01",
+            now=datetime(2023, 6, 1, 10, tzinfo=timezone.utc),
+            executor=ledger,
+        )
+
+
+def test_legacy_catalog_extension_remains_byte_frozen(account):
+    root, inputs = account
+    catalog_path = Path(inputs["catalog"])
+    catalog = pd.read_csv(catalog_path, dtype=str)
+    catalog.loc[:, "effective_to"] = "2099-01-01T00:00:00Z"
+    catalog.to_csv(catalog_path, index=False)
+    with pytest.raises(ValueError, match="Historical inputs were revised after promotion"):
+        paper.observe(
+            root,
+            inputs,
+            as_of="2023-06-01",
+            now=datetime(2023, 6, 1, 10, tzinfo=timezone.utc),
+            executor=ledger,
+        )
 
 
 @pytest.mark.parametrize("relative_path", [False, True])

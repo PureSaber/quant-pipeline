@@ -43,13 +43,18 @@ class FakeLedger:
         rate = (0.03 if training else -0.02) if candidate["name"] == "alternative" else 0.01
         returns = pd.Series([0.0] + [rate] * (len(dates) - 1), index=dates)
         returns.to_csv(out / "returns.csv", header=["net_return"])
+        signal_delay = candidate["signal_delay"]
         return {
             "metrics": {**return_metrics(returns), "fills": 1, "cost_total": 5},
             "factor_evidence": {
+                "signal_delay": signal_delay,
+                "signal_representation": (
+                    "lagged-cross-sectional-percentile-rank" if signal_delay else "factor-value"
+                ),
                 "ic_decay": [
                     {"factor": name, "horizon": 1, "sessions": 3, "rank_ic": -0.5}
                     for name in candidate["factors"]
-                ]
+                ],
             },
             "comparison": {"start": interval["start"], "end": interval["end"], "currency": "CNY"},
             "scope": "synthetic-test",
@@ -105,6 +110,75 @@ def test_direction_learning_uses_only_training_evidence_and_is_frozen_before_tes
     for path in out.glob("fold-*/selection.json"):
         assert path.exists()
     assert candidate["factors"]["momentum_20d"] == 1
+
+
+def test_direction_learning_matches_actual_neutralized_signal(tmp_path):
+    recipe, dates = setup_recipe(tmp_path)
+    recipe["validation"]["direction_policy"] = "train_ic"
+    recipe["neutralization"] = ["industry"]
+    recipe["required_history"] = {"industry": "classification"}
+    ledger = FakeLedger(dates)
+
+    def executor(spec, candidate, out):
+        result = ledger(spec, candidate, out)
+        result["factor_evidence"]["neutralization"] = [
+            {
+                "factor": name,
+                "horizon": 1,
+                "sessions": 3,
+                "applied_by": ["industry"],
+                "neutralized_rank_ic": 0.5,
+            }
+            for name in candidate["factors"]
+        ]
+        return result
+
+    out = tmp_path / "neutralized"
+    out.mkdir()
+    result = WalkForwardExecutor(executor, dates)(recipe, candidates(recipe)[0], out)
+    assert all(
+        set(fold["candidate"]["factors"].values()) == {1} for fold in result["validation"]["folds"]
+    )
+
+
+@pytest.mark.parametrize(
+    "signal_delay,mutation,message",
+    [
+        (1, "missing", "delay evidence"),
+        (1, "wrong_delay", "delay evidence"),
+        (1, "wrong_representation", "signal representation"),
+        (0, "wrong_representation", "signal representation"),
+    ],
+)
+def test_direction_learning_rejects_mismatched_signal_evidence(
+    tmp_path, signal_delay, mutation, message
+):
+    recipe, dates = setup_recipe(tmp_path)
+    recipe["validation"]["direction_policy"] = "train_ic"
+    candidate = candidates(recipe)[0]
+    candidate["signal_delay"] = signal_delay
+    ledger = FakeLedger(dates)
+
+    def executor(spec, selected, out):
+        result = ledger(spec, selected, out)
+        evidence = result["factor_evidence"]
+        if mutation == "missing":
+            evidence.pop("signal_delay")
+            evidence.pop("signal_representation")
+        elif mutation == "wrong_delay":
+            evidence["signal_delay"] = 0
+        else:
+            evidence["signal_representation"] = (
+                "factor-value"
+                if evidence["signal_representation"] != "factor-value"
+                else "lagged-cross-sectional-percentile-rank"
+            )
+        return result
+
+    output = tmp_path / "mismatched-evidence"
+    output.mkdir()
+    with pytest.raises(ValueError, match=message):
+        WalkForwardExecutor(executor, dates)(recipe, candidate, output)
 
 
 def test_incomplete_family_disables_fdr_and_no_failed_candidate_is_dropped(tmp_path):

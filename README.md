@@ -14,12 +14,30 @@ critical/warning alerts.
 
 ## Install
 
+For the current cross-repository research workbench, use the verified
+[quant-workspace research profile](https://github.com/PureSaber/quant-workspace/tree/main/profiles/research-workbench).
+Its bootstrap and verifier install exact source commits and the closed external dependency lock.
+The package's existing Git requirements describe the earlier release closure; installing the
+`research` extra alone is not a substitute for this source profile. Coordinated release versions
+and tags remain a separate release step.
+
 ```bash
 pip install --no-deps -r requirements.lock
 pip check
 pip install -e . --no-deps --no-build-isolation
 pip check
 ```
+
+Continuous walk-forward selected-path results are now published only after complete execution,
+return-date coverage checks and durable evidence writes. Resume validates the summary checksum,
+the complete artifact inventory, frozen selections, and metrics recomputed from verified returns.
+Failed attempts remain in sibling `selected-continuous-attempt-*` directories with diagnostics;
+an interrupted legacy directory without its final summary is preserved before retry. Completed
+legacy caches without the new integrity record fail closed: rerun in a new study output directory,
+leaving the old evidence intact. Upstream training and execution limitations are retained.
+The cache check, recovery, execution and publication share a cross-process lock in a stable
+sibling directory. A competing invocation exits with a lock error and can be retried after the
+active run finishes; it never archives or replaces the active/completed output.
 
 Rebuild the complete runtime, development, and editable-build lock with Python 3.10 so the oldest
 supported interpreter's conditional dependency closure remains explicit:

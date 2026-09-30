@@ -29,6 +29,43 @@ def return_metrics(returns: pd.Series) -> dict:
     }
 
 
+def _validate_training_signal_evidence(factor_evidence: object, candidate: dict) -> None:
+    if not isinstance(factor_evidence, dict):
+        raise TypeError("Training factor evidence must be a mapping")
+    expected_delay = candidate.get("signal_delay", 0)
+    if type(expected_delay) is not int or expected_delay < 0:
+        raise ValueError("Candidate signal_delay must be a non-negative integer")
+    actual_delay = factor_evidence.get("signal_delay")
+    if type(actual_delay) is not int or actual_delay != expected_delay:
+        raise ValueError("Training signal delay evidence does not match the candidate")
+    expected_representation = (
+        "lagged-cross-sectional-percentile-rank" if expected_delay else "factor-value"
+    )
+    if factor_evidence.get("signal_representation") != expected_representation:
+        raise ValueError("Training signal representation does not match the candidate")
+
+
+def training_directions(recipe: dict, candidate: dict, settings: dict, evidence: object) -> dict:
+    """Learn signs from evidence for exactly the signal used by either account policy."""
+    _validate_training_signal_evidence(evidence, candidate)
+    neutralized = bool(recipe.get("neutralization"))
+    rows = {
+        row["factor"]: row
+        for row in evidence.get("neutralization" if neutralized else "ic_decay", [])
+        if row["horizon"] == settings["direction_horizon"]
+    }
+    directions = {}
+    for name in candidate["factors"]:
+        row = rows.get(name, {})
+        value = row.get("neutralized_rank_ic" if neutralized else "rank_ic")
+        if neutralized and set(row.get("applied_by", [])) != set(recipe["neutralization"]):
+            raise ValueError("Training neutralization evidence is incomplete")
+        if value is None or not np.isfinite(value) or row.get("sessions", 0) < 2:
+            raise ValueError(f"Training factor direction unavailable: {name}")
+        directions[name] = 1 if value >= 0 else -1
+    return directions
+
+
 class WalkForwardExecutor:
     """Run each fold in isolated ledgers; all fold accounts start with the same capital.
 
@@ -76,17 +113,9 @@ class WalkForwardExecutor:
             train_dir.mkdir()
             train_result = self.executor(train_recipe, selected, train_dir)
             if settings["direction_policy"] == "train_ic" and candidate["name"] != "buy_hold":
-                evidence = {
-                    row["factor"]: row
-                    for row in train_result["factor_evidence"]["ic_decay"]
-                    if row["horizon"] == settings["direction_horizon"]
-                }
-                for name in selected["factors"]:
-                    row = evidence.get(name, {})
-                    value = row.get("rank_ic")
-                    if value is None or not np.isfinite(value) or row.get("sessions", 0) < 2:
-                        raise ValueError(f"Training factor direction unavailable: {name}")
-                    selected["factors"][name] = 1 if value >= 0 else -1
+                selected["factors"] = training_directions(
+                    recipe, candidate, settings, train_result.get("factor_evidence")
+                )
                 if selected["factors"] != candidate["factors"]:
                     train_dir = fold_root / "train-selected-directions"
                     train_dir.mkdir()
@@ -150,6 +179,7 @@ class WalkForwardExecutor:
         return {
             "metrics": metrics,
             "validation": evaluation,
+            "risk_summary": {"test_folds": [r.get("risk_summary", {}) for r in results]},
             "segments": [
                 {
                     "window": row["test"]["start"],
@@ -171,6 +201,7 @@ class WalkForwardExecutor:
                 "folds": [r.get("factor_evidence", {}) for r in training],
             },
             "limitations": [
+                *sorted({text for result in results for text in result.get("limitations", [])}),
                 "folds restart from cash; entry costs charged each fold",
                 "retrospective walk-forward is not an untouched prospective holdout",
                 "incomplete final test window is reported but not evaluated",
