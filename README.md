@@ -1,5 +1,16 @@
 # quant-pipeline
 
+只读查看已登记的前向账户：
+
+```sh
+python -m quant_pipeline.research_paper inspect /path/to/account
+```
+
+`inspect`核验保存的登记定义、登记时间及全部完成观测的产物哈希，输出结构化JSON。
+它不初始化数据库、不重建报告、不刷新行情，也不执行策略或登记新账户。
+没有观测时绩效为不可用；失败尝试保留。核验范围是已保存证据的一致性，不是当前输入
+新鲜度或实盘有效性认证。查看历史冻结账户可使用单独的维护环境，账户原执行环境保持不变。
+
 研究可信度升级：接口、使用示例、验收及限制见 [11–20 使用说明](docs/RESEARCH_INTEGRITY_11_20.md)。
 
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the

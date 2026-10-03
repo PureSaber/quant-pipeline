@@ -62,6 +62,89 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _account_files(root):
+    return {
+        str(path.relative_to(root)): (_sha256(path), path.stat().st_mtime_ns)
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_inspect_pending_account_is_read_only_and_has_no_invented_performance(account):
+    root, _ = account
+    before = _account_files(root)
+    result = paper.inspect_account(root, now=datetime(2023, 5, 31, tzinfo=timezone.utc))
+    assert result["read_only"] is True
+    assert result["state"] == "pending"
+    assert result["observations"] == [] and result["latest"] is None
+    assert result["evaluation"] is None and result["attempts"] == []
+    assert _account_files(root) == before
+
+
+def test_inspect_verifies_artifacts_preserves_failures_and_sealed_state(account):
+    root, inputs = account
+
+    def fail(*_):
+        raise ValueError("no price")
+
+    now = datetime(2023, 6, 5, 10, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="no price"):
+        paper.observe(root, inputs, as_of="2023-06-05", now=now, executor=fail)
+    paper.observe(root, inputs, as_of="2023-06-05", now=now, executor=ledger)
+    before = _account_files(root)
+    result = paper.inspect_account(root, now=now)
+    assert result["state"] == "observing"
+    assert result["latest"]["metrics"]["sessions"] == 3
+    assert result["attempts"][0]["error"] == "no price"
+    assert [item["as_of"] for item in result["attempts"]] == ["2023-06-05"] * 2
+    assert _account_files(root) == before
+    done = now + timedelta(days=1)
+    assert paper.inspect_account(root, now=done)["state"] == "ended_unsealed"
+    evaluation = paper.seal(root, now=done)
+    before = _account_files(root)
+    result = paper.inspect_account(root, now=done)
+    assert result["state"] == "sealed" and result["evaluation"] == evaluation
+    assert _account_files(root) == before
+    returns = next((root / "observations").rglob("returns.csv"))
+    returns.write_text("tampered", encoding="utf-8")
+    with pytest.raises(ValueError, match="artifact"):
+        paper.inspect_account(root, now=done)
+
+
+@pytest.mark.parametrize("field", ["created_at", "definition_sha256", "definition"])
+def test_inspect_rejects_modified_registration(account, field):
+    root, _ = account
+    path = root / "account.json"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    saved[field] = "changed" if field != "definition" else {}
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    before = _account_files(root)
+    with pytest.raises(ValueError, match="frozen registration"):
+        paper.inspect_account(root)
+    assert _account_files(root) == before
+
+
+def test_inspect_missing_database_never_recreates_it(account):
+    root, _ = account
+    (root / "account.db").unlink()
+    before = _account_files(root)
+    with pytest.raises(FileNotFoundError):
+        paper.inspect_account(root)
+    assert _account_files(root) == before
+
+
+def test_inspect_cli_prints_verified_json_without_generating_report(account, monkeypatch, capsys):
+    root, _ = account
+    (root / "account.html").unlink()
+    before = _account_files(root)
+    monkeypatch.setattr("sys.argv", ["paper", "inspect", str(root)])
+    paper.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result["account_id"] == "forward-a"
+    assert result["read_only"] and result["latest"] is None
+    assert _account_files(root) == before
+
+
 def _write_master_source(
     root: Path,
     *,
