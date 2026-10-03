@@ -172,10 +172,12 @@ def load_account(root: Path) -> dict:
     account = json.loads((root / "account.json").read_text(encoding="utf-8"))
     if account.get("schema_version") != "quant.research-paper/v1":
         raise ValueError("Unsupported paper account")
-    record = TrialRegistry(root / "account.db").definition(account["account_id"])
+    record = TrialRegistry(root / "account.db", read_only=True).definition(account["account_id"])
     if (
         record["sha256"] != account["definition_sha256"]
         or record["definition"] != account["definition"]
+        or digest(record["definition"]) != record["sha256"]
+        or record["registered_at"] != account["created_at"]
     ):
         raise ValueError("Paper account differs from frozen registration")
     return account
@@ -327,25 +329,108 @@ def input_lineage(inputs: dict) -> dict:
     return lineage
 
 
-def observations(root, account):
-    registry = TrialRegistry(root / "account.db")
+def observations(root, account, *, events=None):
+    if events is None:
+        events = TrialRegistry(root / "account.db", read_only=True).history(account["account_id"])
     completed = []
-    for event in registry.history(account["account_id"]):
+    for event in events:
         if event["status"] == "completed":
             payload = event["payload"]
             path = (root / payload["result"]).resolve()
             if root.resolve() not in path.parents:
                 raise ValueError("Observation escapes account")
-            completed.append((verify_result(path, payload["sha256"]), path.parent))
+            result = verify_result(path, payload["sha256"])
+            if result["account_id"] != account["account_id"] or result["status"] != "observed":
+                raise ValueError("Observation identity differs from account")
+            completed.append((result, path.parent))
     return completed
 
 
 def sealed_evidence(root: Path, account_id: str):
-    with TrialRegistry(root / "account.db").connect() as db:
+    with TrialRegistry(root / "account.db", read_only=True).connect() as db:
         row = db.execute(
             "SELECT evidence FROM holdout_evaluations WHERE study_id=?", (account_id,)
         ).fetchone()
     return json.loads(row[0]) if row else None
+
+
+def inspect_account(root: Path, *, now=None) -> dict:
+    """Verify saved registration and observation artifacts without publishing or trading."""
+    now = _now(now)
+    account = load_account(root)
+    spec = account["definition"]
+    events = TrialRegistry(root / "account.db", read_only=True).history(account["account_id"])
+    completed = observations(root, account, events=events)
+    evaluation = sealed_evidence(root, account["account_id"])
+    dates = [result["as_of"] for result, _ in completed]
+    if dates != sorted(set(dates)) or any(
+        not spec["holdout_start"] <= day <= spec["holdout_end"] for day in dates
+    ):
+        raise ValueError("Observation dates violate the frozen interval or ordering")
+    if evaluation is not None and (
+        not completed
+        or evaluation["start"] != spec["holdout_start"]
+        or evaluation["end"] != spec["holdout_end"]
+        or evaluation["code_identity"] != spec["code_identity"]
+        or evaluation["input_sha256"] != digest(completed[-1][0]["input_identity"])
+    ):
+        raise ValueError("Sealed evaluation differs from frozen account evidence")
+    today = now.date().isoformat()
+    if evaluation is not None:
+        state = "sealed"
+    elif today < spec["holdout_start"]:
+        state = "pending"
+    elif today > spec["holdout_end"]:
+        state = "ended_unsealed"
+    else:
+        state = "observing" if completed else "awaiting_observation"
+    attempts = {}
+    for event in events:
+        payload = event["payload"]
+        attempts[event["attempt_id"]] = {
+            "attempt_id": event["attempt_id"],
+            "status": event["status"],
+            "recorded_at": event["recorded_at"],
+            "as_of": payload.get(
+                "as_of",
+                payload.get("context", {}).get(
+                    "as_of", attempts.get(event["attempt_id"], {}).get("as_of")
+                ),
+            ),
+            "error": payload.get("error", payload.get("reason")),
+        }
+    saved = [
+        {
+            "as_of": result["as_of"],
+            "observed_at": result["observed_at"],
+            "metrics": result["metrics"],
+            "diagnostics": result.get("diagnostics", []),
+        }
+        for result, _ in completed
+    ]
+    return {
+        "schema_version": "quant.research-paper-inspection/v1",
+        "read_only": True,
+        "checked_at": now.isoformat(),
+        "verification": "saved_registration_and_observation_artifacts",
+        "account_id": account["account_id"],
+        "definition_sha256": account["definition_sha256"],
+        "created_at": account["created_at"],
+        "state": state,
+        "window": {"start": spec["holdout_start"], "end": spec["holdout_end"]},
+        "candidate": spec["parameters"][0]["name"],
+        "source_scope": spec["source_scope"],
+        "code_identity": spec["code_identity"],
+        "attempts": list(attempts.values()),
+        "observations": saved,
+        "latest": saved[-1] if saved else None,
+        "evaluation": evaluation,
+        "limitations": [
+            "Inspection does not execute the frozen strategy or refresh its inputs",
+            "No observations means unavailable performance, not zero return",
+            "Daily metrics are monitoring data; only sealing produces terminal evaluation",
+        ],
+    }
 
 
 def atomic_json(path: Path, value: dict):
@@ -552,7 +637,7 @@ def seal(root: Path, *, now=None) -> dict:
 
 def write_account_report(root):
     account = load_account(root)
-    registry = TrialRegistry(root / "account.db")
+    registry = TrialRegistry(root / "account.db", read_only=True)
     completed = observations(root, account)
     report = {
         "account_id": account["account_id"],
@@ -597,6 +682,8 @@ def main():
     finish.add_argument("account", type=Path)
     report = sub.add_parser("report")
     report.add_argument("account", type=Path)
+    inspection = sub.add_parser("inspect", help="Read and verify saved evidence without writes")
+    inspection.add_argument("account", type=Path)
     args = parser.parse_args()
     if args.command == "promote":
         value = promote(
@@ -611,6 +698,8 @@ def main():
         value = observe(args.account, load_recipe(args.recipe)["inputs"], as_of=args.as_of)
     elif args.command == "seal":
         value = seal(args.account)
+    elif args.command == "inspect":
+        value = inspect_account(args.account)
     else:
         value = write_account_report(args.account)
     print(canonical(value))

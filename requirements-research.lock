@@ -270,7 +270,7 @@ quant-factors @ git+https://github.com/PureSaber/quant-factors.git@249fb621d4d88
     #   a-share-multifactor
     #   quant-agent
     #   quant-pipeline (pyproject.toml)
-quant-lab @ git+https://github.com/PureSaber/quant-lab.git@a923a791315312a4d9caecf3b9776f08d53bb736
+quant-lab @ git+https://github.com/PureSaber/quant-lab.git@dad8834298ebf008d76d103a1321fb92bef5470c
     # via
     #   a-share-multifactor
     #   quant-agent
