@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puresaber.example/schemas/forward-daily-v1.schema.json",
+  "title": "Manual registered forward daily workflow",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "approval",
+    "account",
+    "account_id",
+    "definition_sha256",
+    "input_recipe",
+    "input_recipe_sha256",
+    "receipt_dir",
+    "market"
+  ],
+  "properties": {
+    "schema_version": {"const": "quant.forward-daily/v1"},
+    "approval": {"enum": ["paused", "approved"]},
+    "account": {"type": "string", "minLength": 1},
+    "account_id": {"type": "string", "minLength": 1},
+    "definition_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "input_recipe": {"type": "string", "minLength": 1},
+    "input_recipe_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "receipt_dir": {"type": "string", "minLength": 1},
+    "market": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timezone", "session_close", "calendar_source"],
+      "properties": {
+        "timezone": {"const": "Asia/Shanghai"},
+        "session_close": {"const": "15:00"},
+        "calendar_source": {"const": "input_bundle"}
+      }
+    }
+  }
+}

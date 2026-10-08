@@ -11,6 +11,10 @@ python -m quant_pipeline.research_paper inspect /path/to/account
 没有观测时绩效为不可用；失败尝试保留。核验范围是已保存证据的一致性，不是当前输入
 新鲜度或实盘有效性认证。查看历史冻结账户可使用单独的维护环境，账户原执行环境保持不变。
 
+已登记账户的手动日常前向编排使用`quant-forward status|plan|run`。它核验明确的交易日历、
+采集时间、当天数据和冻结身份，复用原生账户锁及追加账本；没有调度器且不会自动重试。
+配置、状态和合成验收边界见[前向研究日常流程](docs/FORWARD_DAILY.md)。
+
 研究可信度升级：接口、使用示例、验收及限制见 [11–20 使用说明](docs/RESEARCH_INTEGRITY_11_20.md)。
 
 Deterministic local orchestration for research, backtest, and paper-trading workflows across the

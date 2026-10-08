@@ -39,6 +39,7 @@ quant-pipe = "quant_pipeline.cli:main"
 quant-research = "quant_pipeline.research_workbench:main"
 quant-research-web = "quant_pipeline.research_web:main"
 quant-family-evidence = "quant_pipeline.family_evidence:main"
+quant-forward = "quant_pipeline.forward_daily:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
