@@ -452,7 +452,15 @@ def publish_observation(root: Path, result: dict, directory: Path):
     write_account_report(root)
 
 
-def observe(root: Path, inputs: dict, *, as_of: str, now=None, executor=None) -> dict:
+def observe(
+    root: Path,
+    inputs: dict,
+    *,
+    as_of: str,
+    now=None,
+    executor=None,
+    execution_gate=None,
+) -> dict:
     from a_share_multifactor.decision_workflow import load_inputs
     from a_share_multifactor.research_workbench import EquityResearchExecutor
 
@@ -492,6 +500,12 @@ def observe(root: Path, inputs: dict, *, as_of: str, now=None, executor=None) ->
                     "Historical inputs were revised; forward account cannot be rewritten"
                 )
             if as_of == last["as_of"]:
+                if execution_gate is not None:
+                    execution_gate("before_reuse", evidence)
+                    if last.get("input_identity") != evidence:
+                        raise ValueError(
+                            "Existing observation input identity differs from current evidence"
+                        )
                 publish_observation(root, last, directory)
                 return last
         else:
@@ -506,6 +520,8 @@ def observe(root: Path, inputs: dict, *, as_of: str, now=None, executor=None) ->
         ):
             raise ValueError("Observation endpoints must be exchange sessions")
         history = registry.history(account["account_id"])
+        if execution_gate is not None:
+            execution_gate("before_attempt", evidence)
         terminals = {e["attempt_id"] for e in history if e["status"] != "running"}
         for event in history:
             if event["status"] == "running" and event["attempt_id"] not in terminals:
@@ -565,6 +581,8 @@ def observe(root: Path, inputs: dict, *, as_of: str, now=None, executor=None) ->
                 for p in sorted(out.rglob("*"))
                 if p.is_file()
             }
+            if execution_gate is not None:
+                execution_gate("before_commit", evidence)
             path = out / "result.json"
             path.write_text(canonical(result), encoding="utf-8")
             registry.finish(

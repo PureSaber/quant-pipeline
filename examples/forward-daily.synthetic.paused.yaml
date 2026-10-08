@@ -1,0 +1,14 @@
+schema_version: quant.forward-daily/v1
+# This switch is deliberately paused. It is an operator gate, not proof of research validity.
+approval: paused
+account: ../accounts/synthetic-forward
+account_id: synthetic-forward
+definition_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+input_recipe: ../recipes/synthetic-forward-inputs.yaml
+input_recipe_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+# Receipts stay outside the immutable paper-account tree.
+receipt_dir: ../forward-receipts
+market:
+  timezone: Asia/Shanghai
+  session_close: "15:00"
+  calendar_source: input_bundle
