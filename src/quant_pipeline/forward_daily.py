@@ -62,6 +62,7 @@ class ForwardDailyConfig:
     input_recipe: Path
     input_recipe_sha256: str
     receipt_dir: Path
+    receipt_account_root: Path
     timezone: str
     session_close: time
 
@@ -76,6 +77,15 @@ def _required_string(payload: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ForwardDailyError("CONFIG_INVALID", f"{key} must be a non-empty string")
     return value
+
+
+def _require_separate_path(path: Path, account: Path, name: str) -> None:
+    path = path.resolve()
+    account = account.resolve()
+    if path == account or account in path.parents or path in account.parents:
+        raise ForwardDailyError(
+            "CONFIG_INVALID", f"{name} must be separate from the frozen account tree"
+        )
 
 
 def load_config(path: Path) -> ForwardDailyConfig:
@@ -109,10 +119,8 @@ def load_config(path: Path) -> ForwardDailyConfig:
     close = time.fromisoformat(market["session_close"])
     account = _absolute(path.parent, _required_string(payload, "account"))
     receipts = _absolute(path.parent, _required_string(payload, "receipt_dir"))
-    if receipts == account or account in receipts.parents:
-        raise ForwardDailyError(
-            "CONFIG_INVALID", "receipt_dir must be separate from the frozen account tree"
-        )
+    receipt_account_root = (receipts / account_id).resolve()
+    _require_separate_path(receipt_account_root, account, "per-account receipt root")
     return ForwardDailyConfig(
         path=path,
         sha256=file_hash(path),
@@ -123,6 +131,7 @@ def load_config(path: Path) -> ForwardDailyConfig:
         input_recipe=_absolute(path.parent, _required_string(payload, "input_recipe")),
         input_recipe_sha256=recipe_sha256,
         receipt_dir=receipts,
+        receipt_account_root=receipt_account_root,
         timezone=market["timezone"],
         session_close=close,
     )
@@ -228,6 +237,8 @@ def assess(
     *,
     now: datetime | None = None,
     schema: str = "quant.forward-daily-plan/v1",
+    _lock_owned: bool = False,
+    _binding_only: bool = False,
 ) -> dict[str, Any]:
     """Build a read-only execution decision from frozen and point-in-time evidence."""
     try:
@@ -347,7 +358,7 @@ def assess(
 
     observations = paper.observations(config.account, account)
     covered = _covered_observation(observations, as_of)
-    if covered is not None:
+    if covered is not None and not _binding_only:
         _check(checks, "native_observation", "passed", covered_by=covered["as_of"])
         return _result(
             schema=schema,
@@ -373,7 +384,7 @@ def assess(
 
     events = TrialRegistry(config.account / "account.db", read_only=True).history(config.account_id)
     attempt_status, attempt = _attempt_state(events, as_of)
-    if attempt_status == "running" and _lock_held(config.account):
+    if attempt_status == "running" and not _lock_owned and _lock_held(config.account):
         _check(checks, "exclusive_account_writer", "blocked", attempt_id=attempt["attempt_id"])
         return _result(
             schema=schema,
@@ -616,8 +627,17 @@ def assess(
 
 
 def _write_receipt(config: ForwardDailyConfig, value: dict[str, Any]) -> tuple[Path, str]:
-    directory = config.receipt_dir / config.account_id / value["as_of"]
+    root = config.receipt_account_root.resolve()
+    _require_separate_path(root, config.account, "per-account receipt root")
+    directory = (root / value["as_of"]).resolve()
+    if root != directory and root not in directory.parents:
+        raise ForwardDailyError("CONFIG_INVALID", "receipt path escapes its per-account root")
+    _require_separate_path(directory, config.account, "final receipt directory")
     directory.mkdir(parents=True, exist_ok=True)
+    directory = directory.resolve()
+    if root != directory and root not in directory.parents:
+        raise ForwardDailyError("CONFIG_INVALID", "receipt path escapes its per-account root")
+    _require_separate_path(directory, config.account, "final receipt directory")
     identifier = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + uuid.uuid4().hex
     path = directory / f"{identifier}.json"
     payload = deepcopy(value)
@@ -640,8 +660,8 @@ def run(
 ) -> dict[str, Any]:
     """Execute at most one native observation attempt and write an external audit receipt."""
     now = now or datetime.now(timezone.utc)
-    plan = assess(config_path, as_of, now=now)
     config = load_config(config_path)
+    plan = assess(config_path, as_of, now=now)
     base = {
         "schema_version": "quant.forward-daily-receipt/v1",
         "recorded_at": datetime.now(timezone.utc).isoformat(),
@@ -650,11 +670,48 @@ def run(
         "identity": plan["identity"],
         "checks": plan["checks"],
     }
+    if plan["identity"].get("config_sha256") != config.sha256:
+        receipt = {
+            **base,
+            "outcome": "failed",
+            "state": "execution_binding_changed",
+            "reason": "Forward config changed while the execution plan was being assessed",
+            "error_type": "ForwardDailyError",
+        }
+        path, receipt_sha256 = _write_receipt(config, receipt)
+        return {**receipt, "receipt": str(path), "receipt_sha256": receipt_sha256}
     if plan["action"] != "run":
         outcome = "success" if plan["state"] == "completed" else "blocked"
         receipt = {**base, "outcome": outcome, "state": plan["state"], "reason": plan["reason"]}
         path, receipt_sha256 = _write_receipt(config, receipt)
         return {**receipt, "receipt": str(path), "receipt_sha256": receipt_sha256}
+    expected_identity = deepcopy(plan["identity"])
+    base["execution_binding_sha256"] = digest(expected_identity)
+
+    def execution_gate(stage: str, native_input_identity: dict[str, Any]) -> None:
+        current = assess(
+            config_path,
+            as_of,
+            now=now,
+            _lock_owned=True,
+            _binding_only=True,
+        )
+        if current["action"] != "run":
+            raise ForwardDailyError(
+                "EXECUTION_BINDING_CHANGED",
+                f"Execution gate {stage} is blocked by current state {current['state']}",
+            )
+        if expected_identity.get("input_identity") != native_input_identity:
+            raise ForwardDailyError(
+                "EXECUTION_BINDING_CHANGED",
+                f"Native input identity differs from the execution plan at {stage}",
+            )
+        if current["identity"] != expected_identity:
+            raise ForwardDailyError(
+                "EXECUTION_BINDING_CHANGED",
+                f"Execution identity changed at {stage}",
+            )
+
     try:
         recipe = load_recipe(config.input_recipe)
         observed = paper.observe(
@@ -663,7 +720,13 @@ def run(
             as_of=as_of,
             now=now,
             executor=executor,
+            execution_gate=execution_gate,
         )
+        if observed.get("input_identity") != expected_identity.get("input_identity"):
+            raise ForwardDailyError(
+                "EXECUTION_BINDING_CHANGED",
+                "Native result input identity differs from the execution plan",
+            )
         inspection = paper.inspect_account(config.account, now=now)
         if inspection["latest"] is None or inspection["latest"]["as_of"] != observed["as_of"]:
             raise ValueError("Native ledger verification did not find the completed observation")

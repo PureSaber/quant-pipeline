@@ -178,6 +178,104 @@ def test_success_is_idempotent_and_ledger_is_verified(tmp_path, monkeypatch):
     assert len(list((tmp_path / "receipts").rglob("*.json"))) == 2
 
 
+@pytest.mark.parametrize("mutation", ["approval", "recipe", "capture"])
+def test_pre_attempt_gate_rejects_inputs_changed_after_assessment(tmp_path, monkeypatch, mutation):
+    root, recipe_path, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+    manifest_path = tmp_path / "data" / "inputs" / "manifest.json"
+    original = forward_daily.assess
+
+    def change_after_assessment(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if not kwargs.get("_lock_owned"):
+            if mutation == "approval":
+                value = yaml.safe_load(config.read_text(encoding="utf-8"))
+                value["approval"] = "paused"
+                config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+            elif mutation == "recipe":
+                recipe_path.write_text(
+                    recipe_path.read_text(encoding="utf-8") + "\n", encoding="utf-8"
+                )
+            else:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["captured_at"] = "2023-06-01T17:00:00+08:00"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(forward_daily, "assess", change_after_assessment)
+    result = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+
+    assert result["outcome"] == "failed"
+    assert result["state"] == "execution_failed"
+    assert "success" not in result["reason"].lower()
+    if mutation == "capture":
+        assert "Native input identity differs" in result["reason"]
+    assert TrialRegistry(root / "account.db", read_only=True).history("forward-a") == []
+
+
+def test_before_commit_gate_rejects_input_changed_during_execution(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+    manifest_path = tmp_path / "data" / "inputs" / "manifest.json"
+
+    def mutate_after_execution(*args):
+        result = ledger(*args)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["captured_at"] = "2023-06-01T17:00:00+08:00"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return result
+
+    result = forward_daily.run(config, "2023-06-01", now=NOW, executor=mutate_after_execution)
+
+    assert result["outcome"] == "failed"
+    assert result["state"] == "execution_failed"
+    assert "Execution identity changed at before_commit" in result["reason"]
+    history = TrialRegistry(root / "account.db", read_only=True).history("forward-a")
+    assert [event["status"] for event in history] == ["running", "failed"]
+    assert not any(event["status"] == "completed" for event in history)
+
+
+def test_wrapper_rejects_native_result_with_unbound_input_identity(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+
+    monkeypatch.setattr(
+        paper,
+        "observe",
+        lambda *args, **kwargs: {"input_identity": {"stale": True}},
+    )
+    result = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+
+    assert result["outcome"] == "failed"
+    assert result["state"] == "execution_failed"
+    assert "Native result input identity differs" in result["reason"]
+    assert "native_attempt_id" not in result
+    assert TrialRegistry(root / "account.db", read_only=True).history("forward-a") == []
+
+
+def test_config_changed_during_initial_assessment_never_uses_stale_success_identity(
+    tmp_path, monkeypatch
+):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+    original = forward_daily.assess
+
+    def change_before_assessment(*args, **kwargs):
+        value = yaml.safe_load(config.read_text(encoding="utf-8"))
+        value["approval"] = "paused"
+        config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(forward_daily, "assess", change_before_assessment)
+    result = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+
+    assert result["outcome"] == "failed"
+    assert result["state"] == "execution_binding_changed"
+    assert result["identity"]["config_sha256"] == file_hash(config)
+    assert "native_attempt_id" not in result
+    assert TrialRegistry(root / "account.db", read_only=True).history("forward-a") == []
+
+
 def test_failed_attempt_and_receipt_are_preserved_then_explicitly_retried(tmp_path, monkeypatch):
     root, _, write_config = _setup(tmp_path, monkeypatch)
     config = write_config()
@@ -245,6 +343,64 @@ def test_same_account_concurrency_does_not_duplicate_observation(tmp_path, monke
     assert [event["status"] for event in history] == ["running", "completed"]
 
 
+def test_queued_run_reuses_matching_native_result_without_new_attempt(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+    queued_plan = forward_daily.assess(config, "2023-06-01", now=NOW)
+    assert queued_plan["state"] == "ready"
+
+    first = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+    original = forward_daily.assess
+
+    def resume_queued_plan(*args, **kwargs):
+        if kwargs.get("_lock_owned"):
+            return original(*args, **kwargs)
+        return queued_plan
+
+    monkeypatch.setattr(forward_daily, "assess", resume_queued_plan)
+    reused = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+
+    assert first["outcome"] == reused["outcome"] == "success"
+    history = TrialRegistry(root / "account.db", read_only=True).history("forward-a")
+    assert [event["status"] for event in history] == ["running", "completed"]
+    assert first["native_attempt_id"] == reused["native_attempt_id"] == history[0]["attempt_id"]
+
+
+def test_reuse_rejects_old_native_result_for_new_queued_input_identity(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config()
+    manifest_path = tmp_path / "data" / "inputs" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["captured_at"] = "2023-06-01T17:00:00+08:00"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    queued_plan = forward_daily.assess(config, "2023-06-01", now=NOW)
+    assert queued_plan["state"] == "ready"
+
+    manifest["captured_at"] = "2023-06-01T16:00:00+08:00"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    first = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+    assert first["outcome"] == "success"
+
+    manifest["captured_at"] = "2023-06-01T17:00:00+08:00"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    original = forward_daily.assess
+
+    def resume_queued_plan(*args, **kwargs):
+        if kwargs.get("_lock_owned"):
+            return original(*args, **kwargs)
+        return queued_plan
+
+    monkeypatch.setattr(forward_daily, "assess", resume_queued_plan)
+    reused = forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+
+    assert reused["outcome"] == "failed"
+    assert reused["state"] == "execution_failed"
+    assert "Existing observation input identity differs" in reused["reason"]
+    assert "native_attempt_id" not in reused
+    history = TrialRegistry(root / "account.db", read_only=True).history("forward-a")
+    assert [event["status"] for event in history] == ["running", "completed"]
+
+
 def test_historical_snapshot_cannot_be_introduced_as_new_forward_fact(tmp_path, monkeypatch):
     _, _, write_config = _setup(tmp_path, monkeypatch, captured_at="2023-06-02T16:00:00+08:00")
     result = forward_daily.assess(
@@ -308,6 +464,36 @@ def test_config_contract_rejects_ambiguous_or_unbound_values(tmp_path, monkeypat
     path.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
     with pytest.raises(forward_daily.ForwardDailyError):
         forward_daily.load_config(path)
+
+
+def test_per_account_receipt_root_cannot_resolve_to_frozen_account(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config("paused")
+    renamed = tmp_path / "forward-a"
+    root.rename(renamed)
+    value = yaml.safe_load(config.read_text(encoding="utf-8"))
+    value["account"] = str(renamed)
+    value["receipt_dir"] = str(renamed.parent)
+    config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(forward_daily.ForwardDailyError, match="per-account receipt root"):
+        forward_daily.load_config(config)
+
+
+def test_final_receipt_directory_rejects_existing_symlink_into_account(tmp_path, monkeypatch):
+    root, _, write_config = _setup(tmp_path, monkeypatch)
+    config = write_config("paused")
+    target = tmp_path / "receipts" / "forward-a" / "2023-06-01"
+    target.parent.mkdir(parents=True)
+    try:
+        target.symlink_to(root, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks unavailable: {exc}")
+    before = _files(root)
+
+    with pytest.raises(forward_daily.ForwardDailyError, match="receipt path escapes"):
+        forward_daily.run(config, "2023-06-01", now=NOW, executor=ledger)
+    assert _files(root) == before
 
 
 def test_missing_config_invalid_date_and_naive_clock_are_explicit(tmp_path, monkeypatch):
