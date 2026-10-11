@@ -160,6 +160,33 @@ Path('/work/large').unlink()
     assert result["status"] == "succeeded", result
 
 
+def test_hostile_pid_exhaustion_cannot_claim_success_and_is_cleaned(tmp_path):
+    result = run(
+        tmp_path,
+        """
+import subprocess
+children = []
+try:
+    for _ in range(80):
+        children.append(subprocess.Popen(['sleep', '60']))
+except OSError:
+    print('hostile-pid-saturation', len(children), flush=True)
+else:
+    raise AssertionError('PID limit ineffective')
+# Deliberately leave every child alive. Collector launch may fail because the
+# runtime needs extra PIDs; that must produce a failed result, not a false pass.
+""",
+    )
+    assert result["returncode"] == 0, result
+    assert result["status"] == "failed", result
+    assert "Output collection failed" in result["error"], result
+    assert "hostile-pid-saturation" in (tmp_path / "result/stdout.log").read_text()
+    assert result["cleanup_verified"] is True
+    assert not subprocess.check_output(
+        ["docker", "ps", "-aq", "--filter", "id=" + result["container_id"]], text=True
+    ).strip()
+
+
 def test_output_budget_and_untrusted_symlink(tmp_path):
     result = run(tmp_path, "from pathlib import Path; Path('/work/link').symlink_to('/etc/passwd')")
     assert result["status"] == "failed" and "forbidden" in result["error"], result
