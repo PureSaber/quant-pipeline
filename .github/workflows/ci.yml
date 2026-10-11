@@ -35,6 +35,11 @@ jobs:
       - name: Ruff format
         run: ruff format --check src tests
 
+      - name: Prepare actual Linux containment tests for full coverage
+        run: |
+          docker pull python:3.12-slim
+          echo "QUANT_ISOLATION_IMAGE=$(docker image inspect --format '{{.Id}}' python:3.12-slim)" >> "$GITHUB_ENV"
+
       - name: Full branch coverage
         run: >-
           pytest -q --cov=quant_pipeline --cov-branch

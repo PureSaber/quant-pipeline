@@ -123,6 +123,11 @@ except OSError:
     print('pid-limit-reached', len(children), flush=True)
 else:
     raise AssertionError('PID limit ineffective')
+finally:
+    for child in children:
+        child.terminate()
+    for child in children:
+        child.wait()
 """,
     )
     assert result["status"] == "succeeded", result
@@ -158,6 +163,17 @@ Path('/work/large').unlink()
 def test_output_budget_and_untrusted_symlink(tmp_path):
     result = run(tmp_path, "from pathlib import Path; Path('/work/link').symlink_to('/etc/passwd')")
     assert result["status"] == "failed" and "forbidden" in result["error"], result
+
+
+def test_total_output_budget_across_multiple_regular_files(tmp_path):
+    result = run(
+        tmp_path,
+        "from pathlib import Path; "
+        "Path('/work/a').write_bytes(b'a' * 700000); "
+        "Path('/work/b').write_bytes(b'b' * 700000)",
+    )
+    assert result["status"] == "failed", result
+    assert "Output byte limit exceeded" in result["error"], result
 
 
 def test_log_flood_stopped(tmp_path):
