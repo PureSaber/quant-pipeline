@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import sys
 import threading
 import time
 
@@ -273,3 +274,69 @@ def test_cancel_removes_container_and_all_children(tmp_path):
         ["docker", "ps", "-aq", "--filter", "id=" + container_id], text=True
     )
     assert not remaining.strip()
+
+
+def test_real_isolation_and_pipeline_cli_entrypoints(tmp_path):
+    from quant_pipeline.schema import validate_config
+
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "research.py").write_text(
+        "from pathlib import Path; Path('/work/answer').write_text('42')"
+    )
+    policy = {
+        "schema": "quant.research-isolation/v1",
+        "backend": "docker-linux",
+        "image": os.environ["QUANT_ISOLATION_IMAGE"],
+    }
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy))
+    command = ["/usr/local/bin/python", "-I", "/inputs/research.py"]
+    standalone = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quant_pipeline.isolation",
+            "--policy",
+            str(policy_path),
+            "--inputs",
+            str(inputs),
+            "--output",
+            str(tmp_path / "standalone"),
+            "--",
+            *command,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=40,
+    )
+    assert standalone.returncode == 0, standalone.stdout + standalone.stderr
+    config = {
+        "name": "contained-cli",
+        "steps": [
+            {
+                "name": "research",
+                "cmd": command,
+                "inputs": str(inputs),
+                "output": str(tmp_path / "pipeline"),
+                "isolation": policy,
+            }
+        ],
+    }
+    assert validate_config(config, strict=True) == []
+    config_path = tmp_path / "pipeline.json"
+    config_path.write_text(json.dumps(config))
+    completed = subprocess.run(
+        [sys.executable, "-m", "quant_pipeline.cli", "run", "--config", str(config_path), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=40,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(completed.stdout)["ok"] is True
+    for name in ("standalone", "pipeline"):
+        assert (tmp_path / name / "artifacts/answer").read_text() == "42"
+        result = json.loads((tmp_path / name / "isolation.json").read_text())
+        assert result["cleanup_verified"] and result["evidence_kind"] == "container-execution"

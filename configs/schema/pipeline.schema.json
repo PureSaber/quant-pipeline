@@ -16,11 +16,43 @@
       "items": {
         "type": "object",
         "required": ["cmd"],
+        "allOf": [{
+          "if": { "required": ["isolation"] },
+          "then": {
+            "required": ["inputs", "output"],
+            "properties": {
+              "cmd": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+              "shell": { "const": false }
+            }
+          }
+        }],
         "properties": {
           "name": { "type": "string" },
           "cmd": { "type": ["string", "array"] },
           "cwd": { "type": "string" },
-          "shell": { "type": "boolean" }
+          "shell": { "type": "boolean" },
+          "inputs": { "type": "string", "minLength": 1 },
+          "output": { "type": "string", "minLength": 1 },
+          "isolation": {
+            "type": "object",
+            "required": ["schema", "backend", "image"],
+            "additionalProperties": false,
+            "properties": {
+              "schema": { "const": "quant.research-isolation/v1" },
+              "backend": { "const": "docker-linux" },
+              "image": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "memory_mb": { "type": "integer", "minimum": 64, "maximum": 8192 },
+              "cpus": { "type": "integer", "minimum": 1, "maximum": 8 },
+              "pids": { "type": "integer", "minimum": 16, "maximum": 512 },
+              "work_mb": { "type": "integer", "minimum": 1, "maximum": 1024 },
+              "tmp_mb": { "type": "integer", "minimum": 1, "maximum": 256 },
+              "input_bytes": { "type": "integer", "minimum": 1, "maximum": 1073741824 },
+              "output_bytes": { "type": "integer", "minimum": 1, "maximum": 268435456 },
+              "log_bytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+              "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+              "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+            }
+          }
         }
       }
     }

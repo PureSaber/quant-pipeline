@@ -38,9 +38,21 @@ def validate_config(cfg: dict[str, Any], *, strict: bool = False) -> list[str]:
         if "name" not in step:
             issues.append(f"WARN: steps[{idx}] missing 'name'")
         for key in step:
-            if key not in {"name", "cmd", "cwd", "shell"}:
+            if key not in {"name", "cmd", "cwd", "shell", "isolation", "inputs", "output"}:
                 msg = f"steps[{idx}] unknown key {key!r}"
                 issues.append(msg if strict else f"WARN: {msg}")
+        if "isolation" in step:
+            from quant_pipeline.isolation import IsolationError, validate_policy
+
+            try:
+                validate_policy(step["isolation"])
+            except IsolationError as exc:
+                issues.append(f"steps[{idx}] invalid isolation: {exc}")
+            if not isinstance(step.get("cmd"), list) or step.get("shell"):
+                issues.append(f"steps[{idx}] isolation requires argv list and shell=false")
+            for field in ("inputs", "output"):
+                if not isinstance(step.get(field), str) or not step[field]:
+                    issues.append(f"steps[{idx}] isolation requires {field} path")
     return issues
 
 
