@@ -208,33 +208,37 @@ class JobStore:
             db.close()
 
     def submit(self, request: dict, idempotency_key: str) -> dict:
+        with self._transaction() as db:
+            return self._submit(db, request, idempotency_key)
+
+    def _submit(self, db, request: dict, idempotency_key: str) -> dict:
+        """Submit within the caller's transaction (also used for atomic batches)."""
         encoded = validate_request(request)
         _text(idempotency_key, "idempotency_key")
         identity = hashlib.sha256(encoded.encode()).hexdigest()
-        with self._transaction() as db:
-            previous = db.execute(
-                "SELECT * FROM jobs WHERE idempotency_key=?", (idempotency_key,)
-            ).fetchone()
-            if previous is not None:
-                if previous["request"] != encoded:
-                    raise JobError("idempotency key conflicts with request identity")
-                return self._job(previous)
-            job_id, now = uuid.uuid4().hex, self._now()
-            db.execute(
-                "INSERT INTO jobs(job_id,idempotency_key,request,request_hash,kind,status,"
-                "created_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
-                (job_id, idempotency_key, encoded, identity, request["kind"], now, now),
-            )
-            self._event(
-                db,
-                job_id,
-                now,
-                "submitted",
-                request_hash=identity,
-                project_id=request["project_id"],
-                run_id=request["run_id"],
-            )
-            return self._job(db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+        previous = db.execute(
+            "SELECT * FROM jobs WHERE idempotency_key=?", (idempotency_key,)
+        ).fetchone()
+        if previous is not None:
+            if previous["request"] != encoded:
+                raise JobError("idempotency key conflicts with request identity")
+            return self._job(previous)
+        job_id, now = uuid.uuid4().hex, self._now()
+        db.execute(
+            "INSERT INTO jobs(job_id,idempotency_key,request,request_hash,kind,status,"
+            "created_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+            (job_id, idempotency_key, encoded, identity, request["kind"], now, now),
+        )
+        self._event(
+            db,
+            job_id,
+            now,
+            "submitted",
+            request_hash=identity,
+            project_id=request["project_id"],
+            run_id=request["run_id"],
+        )
+        return self._job(db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
 
     def _expire(self, db, now):
         rows = db.execute(
@@ -348,18 +352,22 @@ class JobStore:
 
     def cancel(self, job_id: str) -> dict:
         with self._transaction() as db:
-            row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
-            job = self._job(row)
-            if job["status"] not in ("queued", "running") or job["cancel_requested"]:
-                return job
-            now = self._now()
-            status = "cancelled" if job["status"] == "queued" else "running"
-            db.execute(
-                "UPDATE jobs SET cancel_requested=1,status=?,updated_at=? WHERE job_id=?",
-                (status, now, job_id),
-            )
-            self._event(db, job_id, now, "cancel_requested", attempt_id=job["attempt_id"])
-            return self._job(db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
+            return self._cancel(db, job_id)
+
+    def _cancel(self, db, job_id: str) -> dict:
+        """Cancel within the caller's transaction."""
+        row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        job = self._job(row)
+        if job["status"] not in ("queued", "running") or job["cancel_requested"]:
+            return job
+        now = self._now()
+        status = "cancelled" if job["status"] == "queued" else "running"
+        db.execute(
+            "UPDATE jobs SET cancel_requested=1,status=?,updated_at=? WHERE job_id=?",
+            (status, now, job_id),
+        )
+        self._event(db, job_id, now, "cancel_requested", attempt_id=job["attempt_id"])
+        return self._job(db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone())
 
     def record_event(self, attempt_id: str, token: int, event: str, **details) -> None:
         """Append execution evidence only while the caller still owns its attempt."""

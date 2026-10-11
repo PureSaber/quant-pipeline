@@ -1,0 +1,1096 @@
+{
+  "schema_version": "quant.batch-capacity-observation/v1",
+  "timestamp_utc": "2026-10-11T15:17:12.580074+00:00",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.14",
+  "cpu_count": 24,
+  "physical_memory_bytes": 34008199168,
+  "packages": {
+    "quant-pipeline": "0.4.0",
+    "quant-data-kit": "0.8.1",
+    "quant-factors": "0.3.0",
+    "quant-lab": "0.3.1",
+    "pandas": "2.3.3",
+    "pyarrow": "25.0.1",
+    "psutil": "7.2.2"
+  },
+  "source_sha256": {
+    "quant_pipeline.durable_batches": "04de5810bc16183e74a6212bb786cd05c15cb5d75db542068f38e55072c845af",
+    "quant_pipeline.durable_jobs": "ecbd22fa4430f30c28ecc80e5310728e4a714a1aa43a964531600994fdc1e13f",
+    "quant_pipeline.durable_research": "64232721e3d84e166835e238cfe2482e773b018435e995c08dd5aa638eb4f8a9",
+    "quant_pipeline.durable_worker": "722df820031bae35a9205825625b162f78cb4aff969f47267d1b245b6ab8f9cb",
+    "quant_data_kit.artifacts": "c374c01b989af7d32e25d745510bfae264f952bcb0e8f76ce3e5db372b8075a5",
+    "quant_data_kit.input_bundles": "6926ce6f0ddbf8e6b41e89e87af0ed28adaeb6d3b978923833544c175500f8b7",
+    "quant_data_kit.shared_snapshots": "adb70c7e6b209fc8a99699e953e2bfe5d44221e313dd8ca28d892e048647174d",
+    "quant_factors.cache": "56884f0994605bf16f1b03568a63c31380b24e38b30ca4fbacff8c8b1959a273",
+    "quant_lab.rolling_research": "26439601a4d823c7de40e1566d0871a35b001b000e4b4887481603e50952d333"
+  },
+  "measurement": {
+    "rss_sampling_seconds": 0.02,
+    "workers": 1,
+    "target": null,
+    "market_data": "synthetic",
+    "end_to_end_streaming": false
+  },
+  "scenarios": [
+    {
+      "rows": 1000,
+      "windows": [
+        5,
+        20,
+        60
+      ],
+      "preparation_seconds": 0.13592100000096252,
+      "total_seconds": 8.213187699999253,
+      "peak_tree_rss_bytes_sampled": 266244096,
+      "source_bytes": 45247,
+      "input_cas_bytes": 46879,
+      "copy_per_candidate_input_bytes_reference": 271482,
+      "cas_total_bytes": 302920,
+      "cache_bytes": 303104,
+      "attempt_bytes": 40906,
+      "workdir_bytes": 827390,
+      "bundle": {
+        "schema_version": "quant.input-bundle-usage/v1",
+        "artifact": {
+          "sha256": "2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "size_bytes": 318,
+          "uri": "qdk+sha256:2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "schema_version": "quant.artifact-ref/v1",
+          "media_type": "application/vnd.quant.input-bundle+json"
+        },
+        "members": 1,
+        "logical_input_bytes": 45,
+        "unique_input_bytes": 45,
+        "manifest_bytes": 318,
+        "retention": "explicit-owner-pins-no-automatic-release"
+      },
+      "rounds": [
+        {
+          "label": "cold",
+          "seconds": 4.168710799996916,
+          "batch_id": "0b3b3b7b1c9b4ae984058b377bc91453",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "4ad2377f5b8b4aa092de8dd96f131baf",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 1000,
+                  "execution_mode": "full",
+                  "input_rows": 1000,
+                  "recomputed_rows": 1000,
+                  "reused_rows": 0
+                },
+                "computation_id": "0d9fc21f230a9647164977ba7133daed713f38724ac4f9945b637a29106c151e",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "da65ce3b1aa2ad09b6227027a4abbc47e9c04104b0662c58a4c6b6828ee51faf",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:da65ce3b1aa2ad09b6227027a4abbc47e9c04104b0662c58a4c6b6828ee51faf"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "37eb754bb213d2c35438bb337af30df9c1efa706a10969b047642cb810196683",
+                  "size_bytes": 3152,
+                  "uri": "qdk+sha256:37eb754bb213d2c35438bb337af30df9c1efa706a10969b047642cb810196683"
+                },
+                "research_id": "fed21d158c393862d5a302ccb85807d6d4e4ec29139db295f0e7697a61a4dbdd",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        6.802423332157815e-06,
+                        0.00010222454722096611
+                      ],
+                      "lags": 0,
+                      "mean": 5.451348527656196e-05,
+                      "standard_error": 2.434282584820074e-05
+                    },
+                    "non_null_rows": 995,
+                    "observation_count": 995,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "e4fb6dd84be8422eb6d11003c7cca804",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 1000,
+                  "execution_mode": "full",
+                  "input_rows": 1000,
+                  "recomputed_rows": 1000,
+                  "reused_rows": 0
+                },
+                "computation_id": "09c6859950437cd520471fa6cb2e08b0a457866493c8c28a72ad8b1e82ae9b6a",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "9d2f08ff795239b5526cb56a09e8032c3337839a53451f3c4005d1beda22bad4",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:9d2f08ff795239b5526cb56a09e8032c3337839a53451f3c4005d1beda22bad4"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "071053d1496811bc899832824d02d2e19e95d117e9a8b33dc0dbd9b332cce770",
+                  "size_bytes": 3153,
+                  "uri": "qdk+sha256:071053d1496811bc899832824d02d2e19e95d117e9a8b33dc0dbd9b332cce770"
+                },
+                "research_id": "515f79ba913903b9b3915bab4d6bed0ded610a6b688447d1f2f1304e04054f3b",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0001622800579502458,
+                        0.00024257738570134579
+                      ],
+                      "lags": 0,
+                      "mean": 0.0002024287218257958,
+                      "standard_error": 2.048438858685034e-05
+                    },
+                    "non_null_rows": 980,
+                    "observation_count": 980,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "727ce38c24a9478e906b0123a521bc9a",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 1000,
+                  "execution_mode": "full",
+                  "input_rows": 1000,
+                  "recomputed_rows": 1000,
+                  "reused_rows": 0
+                },
+                "computation_id": "c4c9c892c58d3aef37407fb79fda4600065e4e76e632090e80c7a3ecd67948c3",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "ac916a91a0da6f21ab5a890d39f4ca32e35cbc4e475e5d7e1b4773f6e3989c0b",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:ac916a91a0da6f21ab5a890d39f4ca32e35cbc4e475e5d7e1b4773f6e3989c0b"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "7b8760167c52f48ec5091f465e077aaae1f5c99a70c28151f78917f91871beeb",
+                  "size_bytes": 3151,
+                  "uri": "qdk+sha256:7b8760167c52f48ec5091f465e077aaae1f5c99a70c28151f78917f91871beeb"
+                },
+                "research_id": "f9ecefc0417a28b07f3570bc48cc4ec7e09deab35422447f708786f032828390",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005478741641596538,
+                        0.0006558436513721142
+                      ],
+                      "lags": 0,
+                      "mean": 0.000601858907765884,
+                      "standard_error": 2.754374265652583e-05
+                    },
+                    "non_null_rows": 940,
+                    "observation_count": 940,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "label": "same-input-warm-cache",
+          "seconds": 3.9074725000027684,
+          "batch_id": "fad549725c774f39bcfa8cfe9952e724",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "ae7f3045e12b46d1809482254122c36a",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 1000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 1000
+                },
+                "computation_id": "0d9fc21f230a9647164977ba7133daed713f38724ac4f9945b637a29106c151e",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "da65ce3b1aa2ad09b6227027a4abbc47e9c04104b0662c58a4c6b6828ee51faf",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:da65ce3b1aa2ad09b6227027a4abbc47e9c04104b0662c58a4c6b6828ee51faf"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "37eb754bb213d2c35438bb337af30df9c1efa706a10969b047642cb810196683",
+                  "size_bytes": 3152,
+                  "uri": "qdk+sha256:37eb754bb213d2c35438bb337af30df9c1efa706a10969b047642cb810196683"
+                },
+                "research_id": "fed21d158c393862d5a302ccb85807d6d4e4ec29139db295f0e7697a61a4dbdd",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        6.802423332157815e-06,
+                        0.00010222454722096611
+                      ],
+                      "lags": 0,
+                      "mean": 5.451348527656196e-05,
+                      "standard_error": 2.434282584820074e-05
+                    },
+                    "non_null_rows": 995,
+                    "observation_count": 995,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "1c991ece946949ab9f277a040c18a2ad",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 1000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 1000
+                },
+                "computation_id": "09c6859950437cd520471fa6cb2e08b0a457866493c8c28a72ad8b1e82ae9b6a",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "9d2f08ff795239b5526cb56a09e8032c3337839a53451f3c4005d1beda22bad4",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:9d2f08ff795239b5526cb56a09e8032c3337839a53451f3c4005d1beda22bad4"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "071053d1496811bc899832824d02d2e19e95d117e9a8b33dc0dbd9b332cce770",
+                  "size_bytes": 3153,
+                  "uri": "qdk+sha256:071053d1496811bc899832824d02d2e19e95d117e9a8b33dc0dbd9b332cce770"
+                },
+                "research_id": "515f79ba913903b9b3915bab4d6bed0ded610a6b688447d1f2f1304e04054f3b",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0001622800579502458,
+                        0.00024257738570134579
+                      ],
+                      "lags": 0,
+                      "mean": 0.0002024287218257958,
+                      "standard_error": 2.048438858685034e-05
+                    },
+                    "non_null_rows": 980,
+                    "observation_count": 980,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "60e287b1060644c2acdde9d74f8faa0c",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 1000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 1000
+                },
+                "computation_id": "c4c9c892c58d3aef37407fb79fda4600065e4e76e632090e80c7a3ecd67948c3",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "ac916a91a0da6f21ab5a890d39f4ca32e35cbc4e475e5d7e1b4773f6e3989c0b",
+                  "size_bytes": 67176,
+                  "uri": "qdk+sha256:ac916a91a0da6f21ab5a890d39f4ca32e35cbc4e475e5d7e1b4773f6e3989c0b"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "7b8760167c52f48ec5091f465e077aaae1f5c99a70c28151f78917f91871beeb",
+                  "size_bytes": 3151,
+                  "uri": "qdk+sha256:7b8760167c52f48ec5091f465e077aaae1f5c99a70c28151f78917f91871beeb"
+                },
+                "research_id": "f9ecefc0417a28b07f3570bc48cc4ec7e09deab35422447f708786f032828390",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005478741641596538,
+                        0.0006558436513721142
+                      ],
+                      "lags": 0,
+                      "mean": 0.000601858907765884,
+                      "standard_error": 2.754374265652583e-05
+                    },
+                    "non_null_rows": 940,
+                    "observation_count": 940,
+                    "status": "computed",
+                    "total_rows": 1000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rows": 5000,
+      "windows": [
+        5,
+        20,
+        60
+      ],
+      "preparation_seconds": 0.13054819999524625,
+      "total_seconds": 8.872944099995948,
+      "peak_tree_rss_bytes_sampled": 285245440,
+      "source_bytes": 224728,
+      "input_cas_bytes": 226361,
+      "copy_per_candidate_input_bytes_reference": 1348368,
+      "cas_total_bytes": 1289441,
+      "cache_bytes": 1380352,
+      "attempt_bytes": 40936,
+      "workdir_bytes": 3070670,
+      "bundle": {
+        "schema_version": "quant.input-bundle-usage/v1",
+        "artifact": {
+          "sha256": "2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "size_bytes": 318,
+          "uri": "qdk+sha256:2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "schema_version": "quant.artifact-ref/v1",
+          "media_type": "application/vnd.quant.input-bundle+json"
+        },
+        "members": 1,
+        "logical_input_bytes": 45,
+        "unique_input_bytes": 45,
+        "manifest_bytes": 318,
+        "retention": "explicit-owner-pins-no-automatic-release"
+      },
+      "rounds": [
+        {
+          "label": "cold",
+          "seconds": 4.717696799998521,
+          "batch_id": "b88a10e906f74bc3aa660fb8b4123d43",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "ac8e73c08f4c460790967624e823e571",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 5000,
+                  "execution_mode": "full",
+                  "input_rows": 5000,
+                  "recomputed_rows": 5000,
+                  "reused_rows": 0
+                },
+                "computation_id": "66d854fd5a6456678563644148ff8cfa35d2227b8e729f7492564e040962aa83",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "5d4e5c63934b5312bc8342521159dc4696e2c88b990d84944f719972a1c3d542",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:5d4e5c63934b5312bc8342521159dc4696e2c88b990d84944f719972a1c3d542"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "c31f0841557e4921b6933f89a54e282fb97dfb973a1ee64faa1209f474fae02b",
+                  "size_bytes": 3158,
+                  "uri": "qdk+sha256:c31f0841557e4921b6933f89a54e282fb97dfb973a1ee64faa1209f474fae02b"
+                },
+                "research_id": "cb7bb09c5551a71d2c8976ace022ce809660653ce8e88bb3f118ba06e6cdea02",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        2.8820989712570316e-05,
+                        7.068481062146641e-05
+                      ],
+                      "lags": 0,
+                      "mean": 4.9752900167018366e-05,
+                      "standard_error": 1.0679742393001243e-05
+                    },
+                    "non_null_rows": 4995,
+                    "observation_count": 4995,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "26a48715c2124f779ce8229b203a001f",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 5000,
+                  "execution_mode": "full",
+                  "input_rows": 5000,
+                  "recomputed_rows": 5000,
+                  "reused_rows": 0
+                },
+                "computation_id": "13c0d1512360fb9547fefdc99db634dbac1b5a86feabdb279da9245718afc1b8",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "243908966d4905d80ee59708be0b70c1030b3207a7f94f63f74e0922fc260e09",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:243908966d4905d80ee59708be0b70c1030b3207a7f94f63f74e0922fc260e09"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "e2bcd2b1d8f534ffd870169eb154349fadbf6604349b98918874c0b59fc81946",
+                  "size_bytes": 3158,
+                  "uri": "qdk+sha256:e2bcd2b1d8f534ffd870169eb154349fadbf6604349b98918874c0b59fc81946"
+                },
+                "research_id": "cd7600dc8fadddd2d9afabe94ec734f9a15b63a336defa45844b7194b642120c",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.00017797602330518836,
+                        0.0002130543308002419
+                      ],
+                      "lags": 0,
+                      "mean": 0.00019551517705271513,
+                      "standard_error": 8.948712265058633e-06
+                    },
+                    "non_null_rows": 4980,
+                    "observation_count": 4980,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "e82550a978294f0fa2cc7b86fa269d8c",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 5000,
+                  "execution_mode": "full",
+                  "input_rows": 5000,
+                  "recomputed_rows": 5000,
+                  "reused_rows": 0
+                },
+                "computation_id": "01f8529cce583122ba194d0f63fdc5f10c0587f9dc8951399f4aa50916825931",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "fe66ea5e56e3f7a903ab2363babdda189d064815e945a42609e95637220f95a0",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:fe66ea5e56e3f7a903ab2363babdda189d064815e945a42609e95637220f95a0"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "d27ad1f06579011e5c60b9a3b239b09d0eb4614930d55e77f4976bce99c0d838",
+                  "size_bytes": 3155,
+                  "uri": "qdk+sha256:d27ad1f06579011e5c60b9a3b239b09d0eb4614930d55e77f4976bce99c0d838"
+                },
+                "research_id": "666e99950fab572a5482d0d580cdaadd114bd31161ea3cde45b19d9a4f8af50c",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005635617932041162,
+                        0.000609744598972326
+                      ],
+                      "lags": 0,
+                      "mean": 0.0005866531960882211,
+                      "standard_error": 1.178154449073908e-05
+                    },
+                    "non_null_rows": 4940,
+                    "observation_count": 4940,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "label": "same-input-warm-cache",
+          "seconds": 4.023971599999641,
+          "batch_id": "fe67e6a121094268ab2f97ea8d29ecc5",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "4f8a35c43a564a798c93d9b887e76985",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 5000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 5000
+                },
+                "computation_id": "66d854fd5a6456678563644148ff8cfa35d2227b8e729f7492564e040962aa83",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "5d4e5c63934b5312bc8342521159dc4696e2c88b990d84944f719972a1c3d542",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:5d4e5c63934b5312bc8342521159dc4696e2c88b990d84944f719972a1c3d542"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "c31f0841557e4921b6933f89a54e282fb97dfb973a1ee64faa1209f474fae02b",
+                  "size_bytes": 3158,
+                  "uri": "qdk+sha256:c31f0841557e4921b6933f89a54e282fb97dfb973a1ee64faa1209f474fae02b"
+                },
+                "research_id": "cb7bb09c5551a71d2c8976ace022ce809660653ce8e88bb3f118ba06e6cdea02",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        2.8820989712570316e-05,
+                        7.068481062146641e-05
+                      ],
+                      "lags": 0,
+                      "mean": 4.9752900167018366e-05,
+                      "standard_error": 1.0679742393001243e-05
+                    },
+                    "non_null_rows": 4995,
+                    "observation_count": 4995,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "90293f38772f43429d76eaefa5241d3c",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 5000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 5000
+                },
+                "computation_id": "13c0d1512360fb9547fefdc99db634dbac1b5a86feabdb279da9245718afc1b8",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "243908966d4905d80ee59708be0b70c1030b3207a7f94f63f74e0922fc260e09",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:243908966d4905d80ee59708be0b70c1030b3207a7f94f63f74e0922fc260e09"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "e2bcd2b1d8f534ffd870169eb154349fadbf6604349b98918874c0b59fc81946",
+                  "size_bytes": 3158,
+                  "uri": "qdk+sha256:e2bcd2b1d8f534ffd870169eb154349fadbf6604349b98918874c0b59fc81946"
+                },
+                "research_id": "cd7600dc8fadddd2d9afabe94ec734f9a15b63a336defa45844b7194b642120c",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.00017797602330518836,
+                        0.0002130543308002419
+                      ],
+                      "lags": 0,
+                      "mean": 0.00019551517705271513,
+                      "standard_error": 8.948712265058633e-06
+                    },
+                    "non_null_rows": 4980,
+                    "observation_count": 4980,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "8bccdaaca2bb4030bcef0aad87220aaa",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 5000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 5000
+                },
+                "computation_id": "01f8529cce583122ba194d0f63fdc5f10c0587f9dc8951399f4aa50916825931",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "fe66ea5e56e3f7a903ab2363babdda189d064815e945a42609e95637220f95a0",
+                  "size_bytes": 336184,
+                  "uri": "qdk+sha256:fe66ea5e56e3f7a903ab2363babdda189d064815e945a42609e95637220f95a0"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "d27ad1f06579011e5c60b9a3b239b09d0eb4614930d55e77f4976bce99c0d838",
+                  "size_bytes": 3155,
+                  "uri": "qdk+sha256:d27ad1f06579011e5c60b9a3b239b09d0eb4614930d55e77f4976bce99c0d838"
+                },
+                "research_id": "666e99950fab572a5482d0d580cdaadd114bd31161ea3cde45b19d9a4f8af50c",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005635617932041162,
+                        0.000609744598972326
+                      ],
+                      "lags": 0,
+                      "mean": 0.0005866531960882211,
+                      "standard_error": 1.178154449073908e-05
+                    },
+                    "non_null_rows": 4940,
+                    "observation_count": 4940,
+                    "status": "computed",
+                    "total_rows": 5000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rows": 20000,
+      "windows": [
+        5,
+        20,
+        60
+      ],
+      "preparation_seconds": 0.13508659999934025,
+      "total_seconds": 12.490502100001322,
+      "peak_tree_rss_bytes_sampled": 356982784,
+      "source_bytes": 921638,
+      "input_cas_bytes": 923272,
+      "copy_per_candidate_input_bytes_reference": 5529828,
+      "cas_total_bytes": 5042595,
+      "cache_bytes": 5455872,
+      "attempt_bytes": 40982,
+      "workdir_bytes": 11596300,
+      "bundle": {
+        "schema_version": "quant.input-bundle-usage/v1",
+        "artifact": {
+          "sha256": "2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "size_bytes": 318,
+          "uri": "qdk+sha256:2308436a47481e666780ab8f438149ef34dd13c55f65206041e899db478c3da2",
+          "schema_version": "quant.artifact-ref/v1",
+          "media_type": "application/vnd.quant.input-bundle+json"
+        },
+        "members": 1,
+        "logical_input_bytes": 45,
+        "unique_input_bytes": 45,
+        "manifest_bytes": 318,
+        "retention": "explicit-owner-pins-no-automatic-release"
+      },
+      "rounds": [
+        {
+          "label": "cold",
+          "seconds": 7.740042500001437,
+          "batch_id": "74a1a0c6b78d44cca470118f2e82467d",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "a174a7fd603d4af892261c5c67e82359",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 20000,
+                  "execution_mode": "full",
+                  "input_rows": 20000,
+                  "recomputed_rows": 20000,
+                  "reused_rows": 0
+                },
+                "computation_id": "12506fa7d75069d7d3d8c0190815f6c05bd29822f5582d78d8b50d723f3f9cc3",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "b35c0306c6bbd3e1b98e5c1f2eab69b2ff0ff6af4b8334f7c2e22a6b27f62ad2",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:b35c0306c6bbd3e1b98e5c1f2eab69b2ff0ff6af4b8334f7c2e22a6b27f62ad2"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "43750b213a04c0c3c83693c849f21d9c69896822d2dde825a8926a7832f2ebff",
+                  "size_bytes": 3161,
+                  "uri": "qdk+sha256:43750b213a04c0c3c83693c849f21d9c69896822d2dde825a8926a7832f2ebff"
+                },
+                "research_id": "3ad76e2cb9f6df65cda299ee89113726499e42d6916a7f292221e69ab2eacbfb",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        3.6094702658580196e-05,
+                        5.5675910070586346e-05
+                      ],
+                      "lags": 0,
+                      "mean": 4.588530636458327e-05,
+                      "standard_error": 4.995297762219158e-06
+                    },
+                    "non_null_rows": 19995,
+                    "observation_count": 19995,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "6f4843a3a929447e9944d54e063f006a",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 20000,
+                  "execution_mode": "full",
+                  "input_rows": 20000,
+                  "recomputed_rows": 20000,
+                  "reused_rows": 0
+                },
+                "computation_id": "1f7e47306a4670799a8138e35b9e80134bfce5482b9497a407ee1cf9f86f77df",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "1bb4246d7e868ff4e148492f9bcae162d9f3f049b1f9f95f68b23fdb8a3a9807",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:1bb4246d7e868ff4e148492f9bcae162d9f3f049b1f9f95f68b23fdb8a3a9807"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "78934d871cda4d2e08234de5dd9e861c26feea34a66b4cc7fbf760906ca7e29f",
+                  "size_bytes": 3161,
+                  "uri": "qdk+sha256:78934d871cda4d2e08234de5dd9e861c26feea34a66b4cc7fbf760906ca7e29f"
+                },
+                "research_id": "7dc815aedcb78326956ce0b81364853ef2cbeb5ec755075bef48c4ef01e26c8d",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.00017426495521526993,
+                        0.0001906541597560927
+                      ],
+                      "lags": 0,
+                      "mean": 0.0001824595574856813,
+                      "standard_error": 4.180996352509202e-06
+                    },
+                    "non_null_rows": 19980,
+                    "observation_count": 19980,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "431ecec271fe4046a59777543469a3fd",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 20000,
+                  "execution_mode": "full",
+                  "input_rows": 20000,
+                  "recomputed_rows": 20000,
+                  "reused_rows": 0
+                },
+                "computation_id": "749645dee3f33e5f957246266492f3ebd71d23796eeee40c22f09c45ddc5ed17",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "2b382997434e24cf00581875e2fe12fcf7cac50a634800a70c904f0aa70b85a7",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:2b382997434e24cf00581875e2fe12fcf7cac50a634800a70c904f0aa70b85a7"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "390c060e6dad69c030d3bac4b5d66bfde0de24e68277d1c2216cc4ac2697f7c1",
+                  "size_bytes": 3160,
+                  "uri": "qdk+sha256:390c060e6dad69c030d3bac4b5d66bfde0de24e68277d1c2216cc4ac2697f7c1"
+                },
+                "research_id": "621f511e97328889214d284cc8610f371f5906b7b66655491c82edd9cb43f98b",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005363141251447198,
+                        0.0005578288078380487
+                      ],
+                      "lags": 0,
+                      "mean": 0.0005470714664913843,
+                      "standard_error": 5.488540315800179e-06
+                    },
+                    "non_null_rows": 19940,
+                    "observation_count": 19940,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "label": "same-input-warm-cache",
+          "seconds": 4.614499499999511,
+          "batch_id": "51269c7a257f421f98657a4d5e97f3e0",
+          "status": "succeeded",
+          "counts": {
+            "queued": 0,
+            "running": 0,
+            "succeeded": 3,
+            "failed": 0,
+            "cancelled": 0
+          },
+          "jobs": [
+            {
+              "job_id": "88af3c6e0b1c4ee2b313ad38492ae0f7",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 20000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 20000
+                },
+                "computation_id": "12506fa7d75069d7d3d8c0190815f6c05bd29822f5582d78d8b50d723f3f9cc3",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "b35c0306c6bbd3e1b98e5c1f2eab69b2ff0ff6af4b8334f7c2e22a6b27f62ad2",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:b35c0306c6bbd3e1b98e5c1f2eab69b2ff0ff6af4b8334f7c2e22a6b27f62ad2"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "43750b213a04c0c3c83693c849f21d9c69896822d2dde825a8926a7832f2ebff",
+                  "size_bytes": 3161,
+                  "uri": "qdk+sha256:43750b213a04c0c3c83693c849f21d9c69896822d2dde825a8926a7832f2ebff"
+                },
+                "research_id": "3ad76e2cb9f6df65cda299ee89113726499e42d6916a7f292221e69ab2eacbfb",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        3.6094702658580196e-05,
+                        5.5675910070586346e-05
+                      ],
+                      "lags": 0,
+                      "mean": 4.588530636458327e-05,
+                      "standard_error": 4.995297762219158e-06
+                    },
+                    "non_null_rows": 19995,
+                    "observation_count": 19995,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "8b94fc51821841ab9d57a4a0108860db",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 20000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 20000
+                },
+                "computation_id": "1f7e47306a4670799a8138e35b9e80134bfce5482b9497a407ee1cf9f86f77df",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "1bb4246d7e868ff4e148492f9bcae162d9f3f049b1f9f95f68b23fdb8a3a9807",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:1bb4246d7e868ff4e148492f9bcae162d9f3f049b1f9f95f68b23fdb8a3a9807"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "78934d871cda4d2e08234de5dd9e861c26feea34a66b4cc7fbf760906ca7e29f",
+                  "size_bytes": 3161,
+                  "uri": "qdk+sha256:78934d871cda4d2e08234de5dd9e861c26feea34a66b4cc7fbf760906ca7e29f"
+                },
+                "research_id": "7dc815aedcb78326956ce0b81364853ef2cbeb5ec755075bef48c4ef01e26c8d",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.00017426495521526993,
+                        0.0001906541597560927
+                      ],
+                      "lags": 0,
+                      "mean": 0.0001824595574856813,
+                      "standard_error": 4.180996352509202e-06
+                    },
+                    "non_null_rows": 19980,
+                    "observation_count": 19980,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            },
+            {
+              "job_id": "23f32f4b6033401a806bf60ee23f1184",
+              "status": "succeeded",
+              "result": {
+                "cache": {
+                  "engine_rows": 0,
+                  "execution_mode": "cache_hit",
+                  "input_rows": 20000,
+                  "recomputed_rows": 0,
+                  "reused_rows": 20000
+                },
+                "computation_id": "749645dee3f33e5f957246266492f3ebd71d23796eeee40c22f09c45ddc5ed17",
+                "factors": {
+                  "media_type": "application/vnd.apache.arrow.stream",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "2b382997434e24cf00581875e2fe12fcf7cac50a634800a70c904f0aa70b85a7",
+                  "size_bytes": 1354928,
+                  "uri": "qdk+sha256:2b382997434e24cf00581875e2fe12fcf7cac50a634800a70c904f0aa70b85a7"
+                },
+                "report": {
+                  "media_type": "application/json",
+                  "schema_version": "quant.artifact-ref/v1",
+                  "sha256": "390c060e6dad69c030d3bac4b5d66bfde0de24e68277d1c2216cc4ac2697f7c1",
+                  "size_bytes": 3160,
+                  "uri": "qdk+sha256:390c060e6dad69c030d3bac4b5d66bfde0de24e68277d1c2216cc4ac2697f7c1"
+                },
+                "research_id": "621f511e97328889214d284cc8610f371f5906b7b66655491c82edd9cb43f98b",
+                "summary": {
+                  "momentum": {
+                    "estimand": "equal-weight cross-sectional factor value by event_time; not investment return",
+                    "hac": {
+                      "assumption": "asymptotic weak-dependence normal approximation",
+                      "ci_95": [
+                        0.0005363141251447198,
+                        0.0005578288078380487
+                      ],
+                      "lags": 0,
+                      "mean": 0.0005470714664913843,
+                      "standard_error": 5.488540315800179e-06
+                    },
+                    "non_null_rows": 19940,
+                    "observation_count": 19940,
+                    "status": "computed",
+                    "total_rows": 20000
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

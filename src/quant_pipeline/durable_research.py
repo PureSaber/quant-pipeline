@@ -3,10 +3,42 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 
-from .durable_jobs import JobStore, validate_request
+from .durable_jobs import JobStore, canonical, validate_request
+
+
+def submit_research_batch(store: JobStore, request: dict, idempotency_key: str) -> dict:
+    """Verify/pin the union once, then publish every child in one job transaction."""
+    from .durable_batches import BatchStore, shared_refs, validate_batch
+
+    request = json.loads(canonical(request))
+    children = validate_batch(request)
+    if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+        raise ValueError("nonempty idempotency key required")
+    owner = "batch-submission/" + hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+    retain_artifacts(owner, shared_refs(*(child["inputs"] for _, child in children)))
+    return BatchStore(store).submit(request, idempotency_key)
+
+
+def retry_research_batch(store: JobStore, batch_id: str, key: str, candidates: list[str]) -> dict:
+    """Keep original pins and reverify before making retry jobs visible."""
+    from .durable_batches import BatchStore, shared_refs
+
+    batches = BatchStore(store)
+    original = batches.get(batch_id)
+    refs = shared_refs(
+        *(
+            member["job"]["request"]["inputs"]
+            for member in original["members"]
+            if member["candidate_id"] in candidates
+        )
+    )
+    owner = "batch-submission/" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+    retain_artifacts(owner, refs)
+    return batches.retry(batch_id, key, candidates)
 
 
 def retain_artifacts(owner: str, refs: list[dict]) -> None:
