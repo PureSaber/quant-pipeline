@@ -1,5 +1,8 @@
 # 独立研究Worker（源码集成候选v1）
 
+多候选原子提交、共享输入、整批取消和保留历史的显式重试见
+[Durable research batches](durable-batches.md)。批次复用本页既有 Worker 和尝试语义。
+
 `durable_jobs.JobStore`提供本机SQLite持久队列、逐次尝试、租约、取消和结构化事件。`durable_worker.Worker`在独立子进程运行管理员登记的可信处理器。提交客户端退出不停止任务；Worker异常退出后，另一Worker在租约到期时回收尝试。现有DAG、Studio Notebook及前向账户入口保持原语义；本功能需显式启用。
 
 ## 运行
