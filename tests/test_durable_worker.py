@@ -52,6 +52,26 @@ def test_subprocess_execution_and_logs(tmp_path):
     assert runner.run_once() is None
 
 
+def test_real_subprocess_preserves_structured_log_fields(tmp_path):
+    runner = worker(tmp_path, "structured_logs")
+    job = runner.store.submit(request(), "logs")
+    finished = runner.run_once()
+    assert finished["status"] == "succeeded"
+    log = tmp_path / "attempts" / finished["attempt_id"] / "stderr.log"
+    events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert [event["event"] for event in events] == ["component_event", "research_event", "log"]
+    assert events[0]["input_rows"] == 7
+    assert events[0]["context"]["run_id"] == "run"
+    assert events[1]["value"] == 9
+    assert "ValueError: example diagnostic" in events[2]["exception"]
+    for event in events:
+        assert event["job_id"] == job["job_id"]
+        assert event["attempt_id"] == finished["attempt_id"]
+        assert event["run_id"] == "run"
+        assert event["worker_id"] == runner.worker_id
+        assert event["timestamp"].endswith("+00:00")
+
+
 def test_failure_retries_in_new_workspace(tmp_path):
     runner = worker(tmp_path, "fail_once")
     job = runner.store.submit(request(), "key")

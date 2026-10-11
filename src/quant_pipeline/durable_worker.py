@@ -19,6 +19,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .durable_jobs import (
@@ -30,6 +31,36 @@ from .durable_jobs import (
     canonical,
     validate_refs,
 )
+
+_LOG_RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__) | {"message", "asctime"}
+
+
+class AttemptLogFormatter(logging.Formatter):
+    """Preserve structured LogRecord extras and bind every record to its attempt."""
+
+    def __init__(self, context: dict):
+        super().__init__()
+        self.context = {key: value for key, value in context.items() if key != "schema_version"}
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = record.getMessage()
+        try:
+            decoded = json.loads(message)
+        except json.JSONDecodeError:
+            decoded = None
+        entry = decoded if isinstance(decoded, dict) else {"message": message}
+        entry.update(
+            {key: value for key, value in record.__dict__.items() if key not in _LOG_RECORD_FIELDS}
+        )
+        entry.setdefault("event", "log")
+        entry.setdefault(
+            "timestamp", datetime.fromtimestamp(record.created, timezone.utc).isoformat()
+        )
+        entry.update(self.context)
+        entry.update({"logger": record.name, "level": record.levelname})
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        return canonical(entry)
 
 
 def resolve_handler(spec: str) -> Callable:
@@ -247,7 +278,10 @@ class Worker:
 
 
 def _child(args) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    context = json.loads((Path(args.workspace) / "context.json").read_text(encoding="utf-8"))
+    log_handler = logging.StreamHandler()
+    log_handler.setFormatter(AttemptLogFormatter(context))
+    logging.basicConfig(level=logging.INFO, handlers=[log_handler], force=True)
     request = json.loads(Path(args.request).read_text(encoding="utf-8"))
     result = resolve_handler(args.handler[0])(request, Path(args.workspace))
     destination = Path(args.result)

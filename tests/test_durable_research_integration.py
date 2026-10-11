@@ -193,6 +193,18 @@ def test_real_shared_snapshot_multi_parameter_failure_and_restart(tmp_path, monk
         assert job["request"]["inputs"] == [snapshot]
         for ref in job["outputs"]:
             artifacts.verify(ArtifactRef.from_dict(ref))
+        log = tmp_path / "attempts" / job["attempt_id"] / "stderr.log"
+        events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+        data_events = [
+            event
+            for event in events
+            if event["event"] in {"artifact_published", "snapshot_query_completed"}
+        ]
+        assert data_events
+        for event in data_events:
+            assert event["timestamp"] and event["job_id"] == job["job_id"]
+            assert event["attempt_id"] == job["attempt_id"]
+            assert event["run_id"] == job["request"]["run_id"]
     assert artifacts.collect(min_age_seconds=0) == []
     with sqlite3.connect(tmp_path / "cache.db") as db:
         assert db.execute("SELECT COUNT(*) FROM factor_cache_inputs_v1").fetchone()[0] == 1

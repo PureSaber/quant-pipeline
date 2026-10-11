@@ -38,6 +38,8 @@ CLI的`get JOB_ID`、`list --status running`、`attempts JOB_ID`、`events JOB_I
 
 每次执行拥有独立attempt目录，保存request.json、context.json、stdout.log、stderr.log和result.json。context包括job_id、attempt_id、fencing_token、worker_id、project_id和run_id。result协议限制1MiB且必须是有限JSON；大产物写CAS并返回引用。可信研究代码仍有当前OS用户权限，此机制不是不可信代码沙箱，也没有硬内存/CPU限额。
 
+子进程的Python日志以逐行JSON写入stderr.log，保留组件LogRecord.extra字段、已有JSON事件和异常堆栈，并附加可信context.json中的任务/尝试身份。数据组件的时间戳、上下文和查询统计不会被普通文本formatter丢弃。处理器直接print的内容仍进入stdout.log。
+
 ## 状态、重试与时间
 
 |事件|前态|后态及约束|
