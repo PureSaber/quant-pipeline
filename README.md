@@ -1,5 +1,10 @@
 # quant-pipeline
 
+Optional Linux Docker research containment is available through `quant-isolate`,
+the `run_isolated` API and explicitly configured pipeline steps. See
+[research isolation](docs/research-isolation.md) for supported hosts, exact image
+identity, limits, cancellation and real containment CI evidence.
+
 独立持久研究队列、Worker及跨仓合成验收见[独立研究Worker](docs/durable-research.md)。
 这是显式启用的源码集成候选，包含租约、重试、取消与共享产物引用；现有部署不自动切换。
 

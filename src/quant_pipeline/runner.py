@@ -104,6 +104,32 @@ def run_step(
     raw_step = raw_step or {"cmd": command}
     argv, use_shell = _resolve_argv(raw_step, command)
     start = time.perf_counter()
+    if "isolation" in raw_step:
+        from quant_pipeline.isolation import IsolationError, run_isolated
+
+        if use_shell or not isinstance(raw_step.get("cmd"), list):
+            raise IsolationError(
+                "Isolated steps require an explicit cmd argument list, shell=false"
+            )
+        if not raw_step.get("inputs") or not raw_step.get("output"):
+            raise IsolationError(
+                "Isolated steps require explicit inputs and new output directories"
+            )
+        base = cwd or Path.cwd()
+        result = run_isolated(
+            argv, base / raw_step["inputs"], base / raw_step["output"], raw_step["isolation"]
+        )
+        output = base / raw_step["output"]
+        return StepResult(
+            name=name,
+            command=" ".join(argv),
+            exit_code=0 if result["status"] == "succeeded" else 2,
+            duration_s=round(time.perf_counter() - start, 3),
+            stdout=(output / "stdout.log").read_text("utf-8", errors="replace")[-_LOG_TAIL:]
+            if (output / "stdout.log").exists()
+            else "",
+            stderr=result.get("error", "") or result["status"],
+        )
     proc = subprocess.run(
         argv,
         shell=use_shell,
