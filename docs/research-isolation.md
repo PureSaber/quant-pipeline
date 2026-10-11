@@ -80,8 +80,10 @@ there is no writable host mount. Write retained artifacts beneath `/work`.
 Combined stdout/stderr has a byte limit and kills an overflowing execution.
 Outputs have a separate total byte/file limit and reject links, sparse files,
 special files, duplicates and traversal. Oversized output causes failure, not
-silent truncation. The container is paused for a stable output snapshot, then
-force-removed with all descendants. Cleanup is verified via the daemon; an
+silent truncation. A trusted container-side collector stops every other non-init
+process before streaming a stable regular-file snapshot, then the container is
+force-removed with all descendants. (The Docker copy API does not reliably expose
+tmpfs mounts.) Cleanup is verified via the daemon; an
 unavailable daemon cannot certify cleanup. A host crash/SIGKILL can prevent
 the supervisor's finally block; operators must inspect containers carrying
 `quant.research-isolation=v1` after an abnormal host shutdown. The CLI/API does

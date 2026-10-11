@@ -18,6 +18,7 @@ def __getattr__(name):
     globals()[name] = value
     return value
 
+
 __all__ = [
     "NON_RETRYABLE_GATE_KINDS",
     "ArtifactSpec",

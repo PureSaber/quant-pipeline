@@ -339,6 +339,7 @@ def run_isolated(argv, inputs, output, policy, cancelled=None):
         "argv": list(argv),
         "seed": policy["seed"],
         "code_sha256": _sha(Path(__file__)),
+        "collector_sha256": _sha(Path(__file__).with_name("isolation_collect.py")),
         "status": "blocked",
         "returncode": None,
         "inputs": {},
@@ -437,13 +438,22 @@ def run_isolated(argv, inputs, output, policy, cancelled=None):
             result.update(
                 returncode=code, status=reason or ("succeeded" if code == 0 else "failed")
             )
-            # Stop user descendants from modifying files during collection. Pause
-            # does not unmount tmpfs; the daemon can still archive its contents.
-            docker.call("pause", name)
             if reason not in {"cancelled", "timeout", "stream_limit"}:
+                # Docker cp's daemon mount view does not expose container tmpfs.
+                # The trusted collector quiesces all other container processes
+                # before archiving. No user process can race file replacement.
+                collector = Path(__file__).with_name("isolation_collect.py").read_text("utf-8")
                 code, archive, error, copy_reason = _bounded(
                     docker,
-                    ["cp", f"{name}:/work/.", "-"],
+                    [
+                        "exec",
+                        name,
+                        "/usr/local/bin/python",
+                        "-I",
+                        "-c",
+                        collector,
+                        str(policy["output_bytes"]),
+                    ],
                     policy["output_bytes"] + 8 * 1024**2,
                     30,
                     cancelled,
@@ -455,6 +465,7 @@ def run_isolated(argv, inputs, output, policy, cancelled=None):
                 artifacts = output / "artifacts"
                 artifacts.mkdir()
                 result["outputs"] = _extract(archive, artifacts, policy["output_bytes"])
+                result["output_collection"] = "quiesced_container_regular_file_archive"
     except (
         IsolationError,
         OSError,
