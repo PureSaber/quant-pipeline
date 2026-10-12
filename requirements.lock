@@ -99,7 +99,7 @@ rpds-py==0.30.0
     # via
     #   jsonschema
     #   referencing
-ruff==0.16.5
+ruff==0.16.9
     # via quant-pipeline (pyproject.toml)
 scipy==1.15.3
     # via
