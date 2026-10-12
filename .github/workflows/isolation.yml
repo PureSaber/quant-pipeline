@@ -1,0 +1,44 @@
+name: real research isolation
+on:
+  pull_request:
+  push:
+    branches: [codex/research-isolation-20261012]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install boundary-only test dependencies
+        run: |
+          python -m pip install pytest==9.1.1 PyYAML==6.0.3
+          python -m pip install -e . --no-deps
+      - name: Resolve test image to immutable local identity
+        run: |
+          docker pull python:3.12-slim
+          echo "QUANT_ISOLATION_IMAGE=$(docker image inspect --format '{{.Id}}' python:3.12-slim)" >> "$GITHUB_ENV"
+          docker image inspect python:3.12-slim > image-identity.json
+          docker info > docker-info.txt
+      - name: Execute real file, network, resources and lifecycle attacks
+        run: python -m pytest -v tests/test_isolation.py tests/test_isolation_docker.py --basetemp=containment-evidence --junitxml=isolation-tests.xml
+      - name: Assert no owned containers remain
+        if: always()
+        run: test -z "$(docker ps -aq --filter label=quant.research-isolation=v1)"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: containment-evidence
+          path: |
+            image-identity.json
+            docker-info.txt
+            isolation-tests.xml
+            containment-evidence/**/isolation.json
+            containment-evidence/**/*.log

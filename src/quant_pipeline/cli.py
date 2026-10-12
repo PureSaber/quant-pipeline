@@ -5,8 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-from quant_pipeline.dag_runner import DagRunner
-from quant_pipeline.dag_schema import load_pipeline_spec
 from quant_pipeline.runner import load_pipeline_config, run_pipeline
 from quant_pipeline.v2_models import PipelineV2Error
 
@@ -33,6 +31,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     config_path = Path(args.config)
     config = load_pipeline_config(config_path)
     if config.get("schema_version") == "2.0.0":
+        from quant_pipeline.dag_runner import DagRunner
+        from quant_pipeline.dag_schema import load_pipeline_spec
+
         if not args.stack_manifest:
             print("v2 requires --stack-manifest", file=sys.stderr)
             return 2
