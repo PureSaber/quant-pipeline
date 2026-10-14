@@ -66,6 +66,20 @@ def _snapshot(profile):
     return manifest, frames
 
 
+def market_capture(profile, manifest):
+    """A master-only child snapshot does not refresh the underlying market data."""
+    from quant_data_kit.research_dataset import load_research_snapshot
+
+    visited = set()
+    while manifest.get("update_evidence", {}).get("market_data_refetched") is False:
+        parent = manifest.get("parent_snapshot_id")
+        if not parent or parent in visited:
+            raise ValueError("Master-only snapshot lacks a valid market-data ancestry")
+        visited.add(parent)
+        manifest, _ = load_research_snapshot(profile["dataset_root"] / "snapshots" / parent)
+    return manifest["captured_at"]
+
+
 def closed_session(frames, now):
     if now.tzinfo is None:
         raise ValueError("Current time must carry a timezone")
@@ -120,6 +134,7 @@ def status(path, *, now=None):
     manifest, frames = _snapshot(profile)
     expected, trading = closed_session(frames, now)
     history = _current_history(profile)
+    captured_at = market_capture(profile, manifest)
     latest = history[-1] if history else None
     successful = [r for r in history if r["state"] == "completed"]
     value = {
@@ -132,10 +147,11 @@ def status(path, *, now=None):
         "data": {
             "snapshot_id": manifest["snapshot_id"],
             "covered_through": manifest["requested_end"],
-            "captured_at": manifest["captured_at"],
+            "captured_at": captured_at,
+            "snapshot_created_at": manifest["captured_at"],
             "fresh": (
                 manifest["requested_end"] == expected
-                and pd.Timestamp(manifest["captured_at"])
+                and pd.Timestamp(captured_at)
                 >= pd.Timestamp(expected, tz="Asia/Shanghai") + pd.Timedelta(hours=15)
             ),
         },
@@ -297,7 +313,8 @@ def run(path, *, mode="tick", now=None):
             operation["data"] = {
                 "snapshot_id": manifest["snapshot_id"],
                 "covered_through": manifest["requested_end"],
-                "captured_at": manifest["captured_at"],
+                "captured_at": market_capture(profile, manifest),
+                "snapshot_created_at": manifest["captured_at"],
                 "quality": quality,
             }
             changes = quality.get("update_evidence", {})

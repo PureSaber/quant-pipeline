@@ -55,6 +55,27 @@ def test_calendar_uses_exchange_sessions_not_weekdays():
         etf_daily.closed_session(frames, datetime(2026, 10, 20, 10, tzinfo=timezone.utc))
 
 
+def test_binding_master_does_not_claim_a_new_market_capture(tmp_path, monkeypatch):
+    import quant_data_kit.research_dataset as qdk
+
+    profile, manifest, _ = setup(tmp_path, monkeypatch)
+    manifest.update(
+        parent_snapshot_id="sha256-parent",
+        update_evidence={"market_data_refetched": False},
+    )
+    monkeypatch.setattr(
+        qdk,
+        "load_research_snapshot",
+        lambda _: (
+            {"captured_at": "2026-10-14T10:00:00+08:00"},
+            {},
+        ),
+    )
+    value = etf_daily.status(profile, now=datetime(2026, 10, 14, 9, tzinfo=timezone.utc))
+    assert value["data"]["captured_at"] == "2026-10-14T10:00:00+08:00"
+    assert not value["data"]["fresh"]
+
+
 def test_refresh_writes_receipt_but_status_has_no_side_effects(tmp_path, monkeypatch):
     profile, _, _ = setup(tmp_path, monkeypatch)
     now = datetime(2026, 10, 14, 9, tzinfo=timezone.utc)
