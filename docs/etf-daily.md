@@ -1,0 +1,39 @@
+# Four ETF research and daily simulation
+
+`python -m quant_pipeline.etf_research check|run --recipe frozen.yaml --output study`
+uses the native equity research runner and retains its entire candidate family,
+baseline, failures, registry and ledger files. `inspect --output study` verifies
+the native registry and artifact identities. Historical results remain retrospective.
+
+`python -m quant_pipeline.etf_daily status|refresh|observe|tick --profile daily.json`
+uses operator-owned absolute paths. Profile keys (schema `quant.etf-daily/v1`):
+`dataset_root`, `recipe`, `output_root`, `forward_config` (null before registration).
+Seed the dataset with QDK `research_dataset build` for 510300, 510500, 159915, 588000.
+The recipe must retain the original weekly strategy; only its input snapshot paths
+are replaced. Output, source and account directories must be separate.
+
+`refresh` acquires a new immutable QDK snapshot and runs the complete native
+preflight. `observe` explicitly rechecks and executes/retries a previously registered
+account through `forward_daily`; it does not register, assemble or replace an account.
+`tick` uses the exchange calendar and Shanghai 16:30, 17:00 and 18:00 slots. Only
+transport errors or a missing final bar are automatically retried. Earlier gaps,
+historical revisions, identity changes and ledger errors stop the operation.
+Interrupted account execution requires an explicit `observe` under the native
+recovery contract. A stopped collection can be explicitly refreshed after inspection.
+
+Every operation has a hashed receipt. A changed operator profile starts a separate
+history view. One native study lock serializes operations; native account locking
+and idempotency independently prevent duplicate observations. Completed observation
+notifications occur once per date; repeated unchanged failures are quiet.
+
+The daily view reads verified standard/v2 Parquet tables and the original risk and
+execution diagnostics. Positions are simulated. Cost totals are grouped by native
+currency and type; slippage remains a frozen assumption, never a real fill estimate.
+Older artifacts without admitted-target diagnostics show targets as unavailable.
+No return or account-success calculation is implemented in the Studio adapter.
+
+The Studio repository supplies the UI. The workspace `profiles/etf-daily` profile
+pins all installed repositories. Operate a single scheduler against `tick`; preserve
+old paused accounts and obtain a recorded human candidate decision before activation.
+Registration uses actual time and a future calendar session. Five natural sessions
+are operational acceptance, not strategy validation.

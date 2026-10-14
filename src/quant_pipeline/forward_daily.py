@@ -657,6 +657,7 @@ def run(
     *,
     now: datetime | None = None,
     executor=None,
+    operation_gate=None,
 ) -> dict[str, Any]:
     """Execute at most one native observation attempt and write an external audit receipt."""
     now = now or datetime.now(timezone.utc)
@@ -689,6 +690,8 @@ def run(
     base["execution_binding_sha256"] = digest(expected_identity)
 
     def execution_gate(stage: str, native_input_identity: dict[str, Any]) -> None:
+        if operation_gate is not None:
+            operation_gate()
         current = assess(
             config_path,
             as_of,
