@@ -91,4 +91,41 @@ def project_execution(directory, manifest, diagnostics, hashes):
         "ledger_time": str(latest),
         "cost_assumptions": diagnostics.get("cost_assumptions"),
         "cost_totals": [[*key, str(amount)] for key, amount in sorted(cost_totals.items())],
+        "cost_window": cost_window(frames, targets[-1] if targets else None, latest),
+    }
+
+
+def cost_window(frames, target, latest):
+    """Align native budget, fees and quantities to the same latest target window."""
+    if not target or not target.get("checked_at") or not target.get("cost_forecast"):
+        return None
+    begin, end = pd.Timestamp(target["checked_at"]), pd.Timestamp(latest)
+    if begin > end:
+        return None
+    values = {}
+    for name in ("orders", "fills", "costs"):
+        frame = frames[name]
+        at = pd.to_datetime(frame.event_time, utc=True)
+        values[name] = frame[at.ge(begin) & at.le(end)]
+    values["fills"] = values["fills"][values["fills"].order_id.isin(values["orders"].order_id)]
+    values["costs"] = values["costs"][values["costs"].fill_id.isin(values["fills"].fill_id)]
+    fees = {}
+    for row in values["costs"].to_dict("records"):
+        key = (row["currency"], row["cost_type"])
+        fees[key] = fees.get(key, Decimal(0)) + quantity(row, "amount")
+    quantities = {}
+    for name, index in (("orders", 0), ("fills", 1)):
+        for row in values[name].to_dict("records"):
+            key = (row["instrument_id"], row["side"])
+            quantities.setdefault(key, [Decimal(0), Decimal(0)])[index] += quantity(row, "quantity")
+    return {
+        "start": begin.isoformat(),
+        "end": end.isoformat(),
+        "forecast": target["cost_forecast"],
+        "target_admitted": target.get("target_admitted"),
+        "fees": [[*key, str(value)] for key, value in sorted(fees.items())],
+        "quantities": [
+            [*key, str(v[0]), str(v[1]), str(v[0] - v[1])] for key, v in sorted(quantities.items())
+        ],
+        "basis": "Native comprehensive turnover budget and fees-only ledger; no real-slippage measurement. Open target window, no assumed final fill.",
     }

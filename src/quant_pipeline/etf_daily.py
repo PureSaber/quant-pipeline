@@ -29,7 +29,11 @@ def load_profile(path):
     path = Path(path).resolve()
     value = json.loads(path.read_text(encoding="utf-8"))
     required = {"schema", "dataset_root", "recipe", "output_root", "forward_config"}
-    if not isinstance(value, dict) or set(value) != required or value["schema"] != SCHEMA:
+    if (
+        not isinstance(value, dict)
+        or set(value) not in (required, required | {"master_refresh"})
+        or value["schema"] != SCHEMA
+    ):
         raise ValueError("ETF daily profile keys do not match v1")
     for key in required - {"schema"}:
         if key == "forward_config" and value[key] is None:
@@ -48,6 +52,12 @@ def load_profile(path):
     value["profile_path"] = path
     value["profile_sha256"] = file_hash(path)
     value["recipe_sha256"] = file_hash(value["recipe"])
+    refresh = value.get("master_refresh")
+    if refresh is not None:
+        if not isinstance(refresh, str) or not Path(refresh).is_absolute():
+            raise ValueError("master_refresh must be an absolute operator-configured path")
+        value["master_refresh"] = Path(refresh).resolve()
+    value["master_refresh_sha256"] = file_hash(value["master_refresh"]) if refresh else None
     value["operator_sha256"] = (
         file_hash(value["forward_config"]) if value["forward_config"] else None
     )
@@ -99,6 +109,11 @@ def _identity_unchanged(profile):
         raise ValueError("Daily profile changed during execution")
     if file_hash(profile["recipe"]) != profile["recipe_sha256"]:
         raise ValueError("Frozen baseline recipe changed during execution")
+    if (
+        profile.get("master_refresh")
+        and file_hash(profile["master_refresh"]) != profile["master_refresh_sha256"]
+    ):
+        raise ValueError("Master refresh configuration changed during execution")
 
 
 def _read_receipt(path):
@@ -124,6 +139,7 @@ def _current_history(profile):
         if r["profile_sha256"] == profile["profile_sha256"]
         and r["recipe_sha256"] == profile["recipe_sha256"]
         and r.get("operator_sha256") == profile["operator_sha256"]
+        and r.get("master_refresh_sha256") == profile["master_refresh_sha256"]
     ]
 
 
@@ -291,6 +307,7 @@ def run(path, *, mode="tick", now=None):
             "profile_sha256": profile["profile_sha256"],
             "recipe_sha256": profile["recipe_sha256"],
             "operator_sha256": profile["operator_sha256"],
+            "master_refresh_sha256": profile["master_refresh_sha256"],
             "notify": False,
         }
 
@@ -306,6 +323,16 @@ def run(path, *, mode="tick", now=None):
         publish()
         try:
             _identity_unchanged(profile)
+            if profile.get("master_refresh"):
+                from quant_data_kit.research_dataset import bind_instrument_master
+
+                from quant_pipeline.etf_master_refresh import refresh
+
+                stage("master_refresh", "running")
+                bundle, evidence = refresh(profile["master_refresh"], directory / "master-refresh")
+                _identity_unchanged(profile)
+                bind_instrument_master(profile["dataset_root"], bundle)
+                stage("master_refresh", "completed", evidence=evidence)
             stage("collection", "running")
             if mode != "observe":
                 update_dataset(profile["dataset_root"], end=as_of, overlap_sessions=5)

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -97,10 +97,23 @@ def test_refresh_writes_receipt_but_status_has_no_side_effects(tmp_path, monkeyp
         raise TimeoutError("today has not published yet")
 
     monkeypatch.setattr(qdk, "update_dataset", delayed)
-    etf_daily.run(profile, mode="refresh", now=now)
-    state = etf_daily.status(profile, now=now)
+    etf_daily.run(profile, mode="refresh", now=now + timedelta(minutes=1))
+    state = etf_daily.status(profile, now=now + timedelta(minutes=1))
     assert state["latest"]["state"] == "collection_retryable"
     assert state["research_input"]["id"] == value["id"]
+
+
+def test_changed_master_refresh_configuration_blocks_identity(tmp_path, monkeypatch):
+    profile, _, _ = setup(tmp_path, monkeypatch)
+    refresh = tmp_path / "refresh.json"
+    refresh.write_text("{}")
+    value = json.loads(profile.read_text())
+    value["master_refresh"] = str(refresh)
+    profile.write_text(json.dumps(value))
+    loaded = etf_daily.load_profile(profile)
+    refresh.write_text('{"changed": true}')
+    with pytest.raises(ValueError, match="Master refresh configuration changed"):
+        etf_daily._identity_unchanged(loaded)
 
 
 @pytest.mark.parametrize(
