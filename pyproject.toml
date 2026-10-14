@@ -22,7 +22,7 @@ research = [
     "arch>=7.2,<9",
     "quant-agent @ git+https://github.com/PureSaber/quant-agent.git@6085431dd041a555b8c116c2323f5e59566f7dd7",
     "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@711559be4d66f4d1c9387a004587b0848ca004c6",
-    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@3857c3972864da705b64be2a52565a1bcfa9cfb0",
+    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@dcc52c675623d4fd9f331914990b1899b744fca9",
 ]
 dev = [
     "arch>=7.2,<9",
