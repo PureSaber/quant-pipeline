@@ -21,7 +21,7 @@ workspace = []
 research = [
     "arch>=7.2,<9",
     "quant-agent @ git+https://github.com/PureSaber/quant-agent.git@6085431dd041a555b8c116c2323f5e59566f7dd7",
-    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@3f0b3b2bf79c66b989d723e93f2f396e54b11881",
+    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@711559be4d66f4d1c9387a004587b0848ca004c6",
     "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@2b34ec37914b77e3be0458171716a2c0b4bcfa04",
 ]
 dev = [
