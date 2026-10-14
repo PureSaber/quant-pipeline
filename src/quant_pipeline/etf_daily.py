@@ -76,7 +76,7 @@ def market_capture(profile, manifest):
         if not parent or parent in visited:
             raise ValueError("Master-only snapshot lacks a valid market-data ancestry")
         visited.add(parent)
-        manifest, _ = load_research_snapshot(profile["dataset_root"] / "snapshots" / parent)
+        manifest, _ = load_research_snapshot(profile["dataset_root"], parent)
     return manifest["captured_at"]
 
 

@@ -66,7 +66,7 @@ def test_binding_master_does_not_claim_a_new_market_capture(tmp_path, monkeypatc
     monkeypatch.setattr(
         qdk,
         "load_research_snapshot",
-        lambda _: (
+        lambda root, snapshot_id: (
             {"captured_at": "2026-10-14T10:00:00+08:00"},
             {},
         ),
