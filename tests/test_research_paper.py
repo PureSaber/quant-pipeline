@@ -13,7 +13,7 @@ from quant_pipeline.research_validation import return_metrics
 
 
 @pytest.fixture
-def account(tmp_path, monkeypatch):
+def account(tmp_path, monkeypatch, request):
     recipe = load_recipe(create_demo(tmp_path / "data"))
     recipe["interval"] = {"start": "2023-04-03", "end": "2023-05-30"}
     recipe["diagnostics"] = {}
@@ -47,6 +47,7 @@ def account(tmp_path, monkeypatch):
         start="2023-06-01",
         end="2023-06-05",
         now=datetime(2023, 5, 31, tzinfo=timezone.utc),
+        require_timely_orders=getattr(request, "param", False),
     )
     return root, recipe["inputs"]
 
@@ -56,6 +57,45 @@ def ledger(recipe, candidate, output):
     returns = pd.Series([0.0] + [0.01] * (len(dates) - 1), index=dates)
     returns.to_csv(output / "returns.csv", header=["net_return"])
     return {"metrics": return_metrics(returns), "scope": "synthetic-test"}
+
+
+@pytest.mark.parametrize("account", [True], indirect=True)
+def test_native_forward_orders_require_prior_completed_observation(account, monkeypatch):
+    from quant_lab import trials
+
+    from quant_pipeline.research_timing import POLICY
+
+    root, inputs = account
+    clock = [datetime(2023, 6, 2, 14, tzinfo=timezone.utc)]
+
+    class Clock:
+        @staticmethod
+        def now(zone):
+            return clock[0].astimezone(zone)
+
+    monkeypatch.setattr(trials, "datetime", Clock)
+    first = paper.observe(root, inputs, as_of="2023-06-02", now=clock[0])
+    assert first["timing_evidence"]["policy"] == POLICY
+    assert first["timing_evidence"]["orders_recorded"] > 0
+    assert first["timing_evidence"]["verified_fills"] == []
+    clock[0] = datetime(2023, 6, 5, 14, tzinfo=timezone.utc)
+    second = paper.observe(root, inputs, as_of="2023-06-05", now=clock[0])
+    assert second["timing_evidence"]["verified_fills"]
+    before = len(paper.observations(root, paper.load_account(root)))
+    paper.observe(root, inputs, as_of="2023-06-05", now=clock[0])
+    assert len(paper.observations(root, paper.load_account(root))) == before
+
+
+@pytest.mark.parametrize("account", [True], indirect=True)
+def test_native_missed_first_observation_does_not_publish_backfilled_ledger(account):
+    root, inputs = account
+    with pytest.raises(ValueError, match="TIMELY_ORDER_MISSING"):
+        paper.observe(
+            root, inputs, as_of="2023-06-05", now=datetime(2023, 6, 5, 14, tzinfo=timezone.utc)
+        )
+    assert not paper.observations(root, paper.load_account(root))
+    assert not (root / "latest.json").exists()
+    assert paper.inspect_account(root)["attempts"][-1]["status"] == "failed"
 
 
 def _sha256(path: Path) -> str:

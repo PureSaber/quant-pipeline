@@ -11,8 +11,8 @@ license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
-    "quant-lab @ git+https://github.com/PureSaber/quant-lab.git@126e0ce1ae3cad7121baf7c311365ca4a7ad42c8",
-    "quant-factors @ git+https://github.com/PureSaber/quant-factors.git@249fb621d4d880942cb5dfbbcd812c0d45bf45a2",
+    "quant-lab @ git+https://github.com/PureSaber/quant-lab.git@4c48f8a678c8d29a7dc46294c99f0e668cd6c52b",
+    "quant-factors @ git+https://github.com/PureSaber/quant-factors.git@1c798bc737bc92fa5eca85dd0663dc608104f721",
     "quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@v0.3.1",
 ]
 
@@ -20,9 +20,9 @@ dependencies = [
 workspace = []
 research = [
     "arch>=7.2,<9",
-    "quant-agent @ git+https://github.com/PureSaber/quant-agent.git@fb8feabddfef88bafd694b44d7398d1b1ff8e99e",
-    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@d23464510285a0db7168728b51b29c34f4f9e62f",
-    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@7907140e1177e0e55e412b1ef35f17e55ba9b248",
+    "quant-agent @ git+https://github.com/PureSaber/quant-agent.git@6085431dd041a555b8c116c2323f5e59566f7dd7",
+    "a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@711559be4d66f4d1c9387a004587b0848ca004c6",
+    "quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@dcc52c675623d4fd9f331914990b1899b744fca9",
 ]
 dev = [
     "arch>=7.2,<9",
