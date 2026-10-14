@@ -87,8 +87,20 @@ def test_refresh_writes_receipt_but_status_has_no_side_effects(tmp_path, monkeyp
     assert not value["notify"]
     state = etf_daily.status(profile, now=now)
     assert state["latest"]["id"] == value["id"]
+    assert state["research_input"]["id"] == value["id"]
     assert state["last_success"] is None
     assert not state["execution"]["available"]
+
+    import quant_data_kit.research_dataset as qdk
+
+    def delayed(*args, **kwargs):
+        raise TimeoutError("today has not published yet")
+
+    monkeypatch.setattr(qdk, "update_dataset", delayed)
+    etf_daily.run(profile, mode="refresh", now=now)
+    state = etf_daily.status(profile, now=now)
+    assert state["latest"]["state"] == "collection_retryable"
+    assert state["research_input"]["id"] == value["id"]
 
 
 @pytest.mark.parametrize(

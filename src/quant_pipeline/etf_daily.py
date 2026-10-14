@@ -156,6 +156,7 @@ def status(path, *, now=None):
             ),
         },
         "latest": latest,
+        "research_input": next((r for r in reversed(history) if r.get("research_recipe")), None),
         "last_success": successful[-1] if successful else None,
         "forward": None,
         "account": None,
