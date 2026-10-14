@@ -230,3 +230,150 @@ def test_prerequisite_failure_rejects_preview(registration, monkeypatch):
     with pytest.raises(ValueError, match="prerequisites failed"):
         service.preview(request, now=NOW)
     assert not service.accounts.exists()
+
+
+@pytest.mark.parametrize("change", ["schema", "ttl", "relative", "overlap"])
+def test_operator_configuration_rejects_unsafe_roots(tmp_path, change):
+    config = {
+        "schema": SCHEMA,
+        "runs_root": str(tmp_path / "runs"),
+        "accounts_root": str(tmp_path / "accounts"),
+        "state_root": str(tmp_path / "state"),
+        "preview_ttl_seconds": 600,
+    }
+    if change == "schema":
+        config["unexpected"] = True
+    elif change == "ttl":
+        config["preview_ttl_seconds"] = 0
+    elif change == "relative":
+        config["runs_root"] = "relative"
+    else:
+        config["state_root"] = str(tmp_path / "runs" / "nested")
+    path = tmp_path / "config.json"
+    write(path, config)
+    with pytest.raises(ValueError):
+        Registration(path)
+
+
+def test_cli_round_trip_and_closed_request_schema(registration, monkeypatch, capsys):
+    from quant_pipeline.project_registration import main
+
+    service, request = registration
+    original_now = paper._now
+    monkeypatch.setattr(paper, "_now", lambda now: original_now(now or NOW))
+
+    def call(command, value):
+        status = main([command, "--config", str(service.path), "--request-json", json.dumps(value)])
+        return status, json.loads(capsys.readouterr().out)
+
+    status, preview = call("preview", request)
+    assert status == 0
+    ref = {"project_id": request["project_id"], "preview_id": preview["id"]}
+    assert call("inspect", ref)[1]["state"] == "prepared"
+    assert call("list", {"project_id": request["project_id"]})[1]["previews"]
+    assert call("commit", ref)[1]["state"] == "completed"
+    assert call("inspect", ref)[1]["inspection"]["observations"] == []
+    assert call("commit", {**ref, "command": "injected"})[0] == 2
+    assert call("list", ref)[0] == 2
+    assert call("preview", {**request, "path": "untrusted"})[0] == 2
+    from quant_pipeline.project_registration import _child
+
+    with pytest.raises(ValueError, match="escapes"):
+        _child(service.runs, "../outside")
+
+
+def test_source_project_family_and_manifest_gates(registration):
+    service, request = registration
+    run = service.runs / request["run_id"]
+    path = run / "request.json"
+    saved = json.loads(path.read_text())
+    for replacement, message in [
+        ({**saved, "research_project": {"id": "other"}}, "explicitly bound"),
+        ({**saved, "recipe": {}}, "no longer connected"),
+        ({**saved, "template_id": "other"}, "completed native"),
+    ]:
+        write(path, replacement)
+        with pytest.raises(ValueError, match=message):
+            service.preview(request, now=NOW)
+    write(path, saved)
+    result_path = run / "result.json"
+    result = json.loads(result_path.read_text())
+    for replacement, message in [
+        ({**result, "status": "failed"}, "completed native"),
+        ({**result, "verification_status": "failed"}, "verification failed"),
+        ({**result, "output_hashes": {}}, "artifact manifest"),
+    ]:
+        write(result_path, replacement)
+        with pytest.raises(ValueError, match=message):
+            service.preview(request, now=NOW)
+    write(result_path, result)
+    assert not service.accounts.exists()
+
+
+def test_inspection_detects_changed_committed_account(registration):
+    service, request = registration
+    preview = service.preview(request, now=NOW)
+    service.commit(request["project_id"], preview["id"], now=NOW)
+    account_path = service.accounts / preview["account_id"] / "account.json"
+    account = json.loads(account_path.read_text())
+    account["definition_sha256"] = "bad"
+    write(account_path, account)
+    assert service.get(request["project_id"], preview["id"])["inspection_error"]
+    with pytest.raises(ValueError):
+        service.commit(request["project_id"], preview["id"], now=NOW)
+
+
+def test_etf_native_inspection_exposes_verified_versions_and_errors(registration, capsys):
+    from quant_pipeline import etf_research
+
+    service, request = registration
+    output = service.runs / request["run_id"] / "strategy-output"
+    assert etf_research.main(["inspect", "--output", str(output)]) == 0
+    value = json.loads(capsys.readouterr().out)
+    assert value["family_complete"] and value["attempt_dates"]
+    assert value["recipe"] and value["definition_sha256"]
+    assert all(
+        row["code_identity"] and row["input_identity"] and row["parameters"]
+        for row in value["results"]
+    )
+    (output / "study.json").write_text("broken")
+    assert etf_research.main(["inspect", "--output", str(output)]) == 2
+    assert json.loads(capsys.readouterr().out)["state"] == "failed"
+
+
+def test_etf_preflight_universe_gate_and_cli_contract(monkeypatch, tmp_path, capsys):
+    import a_share_multifactor.decision_workflow as inputs
+    import a_share_multifactor.research_workbench as research
+    import pandas as pd
+
+    from quant_pipeline import etf_research, research_workbench
+
+    recipe = {
+        "backend": "equity",
+        "strategy": {"frequency": "weekly"},
+        "inputs": {"bundle": str(tmp_path)},
+    }
+    monkeypatch.setattr(etf_research, "load_recipe", lambda _: recipe)
+    frame = pd.DataFrame({"symbol": etf_research.SYMBOLS, "source": ["synthetic"] * 4})
+    monkeypatch.setattr(inputs, "load_inputs", lambda _: ({}, {"raw": frame}))
+    monkeypatch.setattr(research, "preflight_recipe", lambda _: {"passed": True})
+    assert etf_research.main(["check", "--recipe", "fixture"]) == 0
+    value = json.loads(capsys.readouterr().out)
+    assert value["read_only"] and value["investable"] is False
+    assert value["evidence_kind"] == "synthetic"
+    called = []
+    monkeypatch.setattr(research_workbench, "run_research", lambda *args: called.append(args))
+    monkeypatch.setattr(etf_research, "inspect_study", lambda _: {"family_complete": True})
+    assert etf_research.main(["run", "--recipe", "fixture", "--output", str(tmp_path)]) == 0
+    capsys.readouterr()
+    assert called and (tmp_path / "studio-view.json").is_file()
+    monkeypatch.setattr(research, "preflight_recipe", lambda _: {"passed": False})
+    assert etf_research.main(["run", "--recipe", "fixture", "--output", str(tmp_path)]) == 3
+    capsys.readouterr()
+    assert len(called) == 1
+    frame.loc[0, "symbol"] = "unapproved"
+    with pytest.raises(ValueError, match="fixed four-symbol"):
+        etf_research.preflight("fixture")
+    recipe["backend"] = "fixture"
+    with pytest.raises(ValueError, match="weekly equity"):
+        etf_research.preflight("fixture")
