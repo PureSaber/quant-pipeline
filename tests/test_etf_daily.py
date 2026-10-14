@@ -224,11 +224,40 @@ def candidate(tmp_path, monkeypatch):
     monkeypatch.setattr(
         etf_daily.research_paper,
         "load_account",
-        lambda *a: {"definition": {"holdout_start": "2026-10-14"}},
+        lambda *a: {"definition": {"holdout_start": "2026-10-14", "holdout_end": "2026-12-31"}},
     )
     monkeypatch.setattr(etf_daily.forward_daily, "assess", lambda *a, **k: {"state": "ready"})
     monkeypatch.setattr(etf_daily, "execution_view", lambda *a: {"available": True})
     return profile
+
+
+@pytest.mark.parametrize("start,end", [("2026-10-16", "2026-12-31"), ("2026-10-01", "2026-10-13")])
+def test_outside_window_delegates_native_gate_without_collection(tmp_path, monkeypatch, start, end):
+    import a_share_multifactor.research_workbench as equity
+    import quant_data_kit.research_dataset as qdk
+
+    profile = candidate(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        etf_daily.research_paper,
+        "load_account",
+        lambda *a: {"definition": {"holdout_start": start, "holdout_end": end}},
+    )
+    calls = []
+    native = {"state": "outside_window", "read_only": True, "action": "none"}
+    monkeypatch.setattr(
+        etf_daily.forward_daily,
+        "assess",
+        lambda *a, **k: calls.append(a[1]) or native,
+    )
+
+    def unexpected(*a, **k):
+        pytest.fail("An out-of-window tick must not collect or preflight")
+
+    monkeypatch.setattr(qdk, "update_dataset", unexpected)
+    monkeypatch.setattr(equity, "preflight_recipe", unexpected)
+    assert etf_daily.run(profile, now=datetime(2026, 10, 14, 9, tzinfo=timezone.utc)) is native
+    assert calls == ["2026-10-14"]
+    assert not list((tmp_path / "operations").glob("*/operation.json"))
 
 
 def test_retry_slots_and_same_day_idempotency(tmp_path, monkeypatch):

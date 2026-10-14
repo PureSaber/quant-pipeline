@@ -292,6 +292,12 @@ def run(path, *, mode="tick", now=None):
             if config.approval != "approved":
                 return {"state": "paused", "read_only": True}
             research_paper.inspect_account(config.account, now=now)
+            if mode != "refresh":
+                definition = research_paper.load_account(config.account)["definition"]
+                if not definition["holdout_start"] <= as_of <= definition["holdout_end"]:
+                    # Let the native contract verify identities and explain the window.
+                    # Do not collect or preflight a reversed/expired observation interval.
+                    return forward_daily.assess(profile["forward_config"], as_of, now=now)
         identifier = uuid.uuid4().hex
         directory = root / identifier
         directory.mkdir()
@@ -507,6 +513,7 @@ def main(argv=None):
                 "market_closed",
                 "not_due",
                 "already_attempted",
+                "outside_window",
             }
             else 3
         )
