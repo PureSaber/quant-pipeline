@@ -46,6 +46,9 @@ def inspect_study(output):
                 "comparison": row.get("comparison"),
                 "error": row.get("error"),
                 "scope": row.get("scope"),
+                "parameters": row["candidate"],
+                "code_identity": row.get("identity"),
+                "input_identity": row.get("data_identity"),
             }
         )
     return {
@@ -57,6 +60,12 @@ def inspect_study(output):
         if any("synthetic" in str(r.get("scope")) for r in records)
         else "retrospective",
         "study_id": study["recipe"]["study_id"],
+        "definition_sha256": study["definition_sha256"],
+        "recipe": study["recipe"],
+        "attempt_dates": [
+            {key: event.get(key) for key in ("attempt_id", "status", "recorded_at")}
+            for event in study.get("attempts", [])
+        ],
         "comparison_basis": {
             key: study["recipe"].get(key) for key in ("interval", "costs", "validation", "inputs")
         },
