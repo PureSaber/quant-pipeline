@@ -300,7 +300,7 @@ quant-lab @ git+https://github.com/PureSaber/quant-lab.git@4c48f8a678c8d29a7dc46
     #   quant-report-hub
 quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@7cba8409559fb1625e88b15b983a446e2e6e61d6
     # via a-share-multifactor
-quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@2b34ec37914b77e3be0458171716a2c0b4bcfa04
+quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@3857c3972864da705b64be2a52565a1bcfa9cfb0
     # via quant-pipeline (pyproject.toml)
 quant-risk-monitor @ git+https://github.com/PureSaber/quant-risk-monitor.git@e26117c792b08477ff131d3c876c0bde4c1f05b1
     # via a-share-multifactor
