@@ -377,3 +377,53 @@ def test_etf_preflight_universe_gate_and_cli_contract(monkeypatch, tmp_path, cap
     recipe["backend"] = "fixture"
     with pytest.raises(ValueError, match="weekly equity"):
         etf_research.preflight("fixture")
+
+
+def test_read_only_promotion_rejects_invalid_protocol_and_missing_trading_history(
+    registration, monkeypatch
+):
+    from copy import deepcopy
+
+    import pandas as pd
+    import quant_data_kit.research_coverage as coverage
+    import quant_report_hub.research_workbench as report
+
+    service, request = registration
+    source = service.runs / request["run_id"] / "strategy-output/study.json"
+    original = report.load_study(source)
+    summary = deepcopy(original)
+    monkeypatch.setattr(report, "load_study", lambda _: summary)
+
+    def prepare(now=NOW):
+        return paper.prepare_promotion(
+            source, "base", account_id="test", start=request["start"], end=request["end"], now=now
+        )
+
+    summary["recipe"]["backend"] = "fixture"
+    with pytest.raises(ValueError, match="equity backend"):
+        prepare()
+    summary = deepcopy(original)
+    summary["results"][0]["status"] = "failed"
+    with pytest.raises(ValueError, match="entire preregistered"):
+        prepare()
+    summary = deepcopy(original)
+    summary["recipe"]["validation"] = {"direction_policy": "train_ic"}
+    with pytest.raises(ValueError, match="explicit factor directions"):
+        prepare()
+    summary = deepcopy(original)
+    with pytest.raises(ValueError, match="Timezone-aware"):
+        prepare(NOW.replace(tzinfo=None))
+    with pytest.raises(ValueError, match="latest completed"):
+        prepare(datetime(2022, 1, 1, tzinfo=timezone.utc))
+    summary["recipe"]["execution"] = {
+        "status_fields": {"listed": "listed", "delisted": "delisted", "tradable": "tradable"}
+    }
+    summary["recipe"]["inputs"]["history"] = "synthetic-test-history"
+    monkeypatch.setattr(paper, "input_identity", lambda _: summary["results"][0]["data_identity"])
+    monkeypatch.setattr(coverage, "load_history", lambda _: ({}, pd.DataFrame()))
+    monkeypatch.setattr(
+        coverage, "asof_history", lambda *args, **kwargs: pd.DataFrame({"symbol": [], "value": []})
+    )
+    with pytest.raises(ValueError, match="trading-state history is incomplete"):
+        prepare()
+    assert not service.accounts.exists()
