@@ -134,7 +134,8 @@ def test_concurrent_refresh_and_tick_share_one_writer(tmp_path, monkeypatch):
             assert (
                 "lock" in str(exc).lower()
                 or "already" in str(exc).lower()
-                or isinstance(exc, PermissionError) and exc.errno == 13
+                or isinstance(exc, PermissionError)
+                and exc.errno == 13
             )
             assert etf_daily.run(profile, now=at(21))["state"] == "completed"
     assert calls == ["collect", "observe"]
