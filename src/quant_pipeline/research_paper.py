@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from copy import deepcopy
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -33,6 +34,7 @@ def promote(
     start: str,
     end: str,
     now=None,
+    require_timely_orders: bool = False,
 ) -> dict:
     from quant_report_hub.research_workbench import load_study
 
@@ -74,6 +76,10 @@ def promote(
             }
             if any(frozen.get(key) != value for key, value in requested.items()):
                 raise ValueError("Existing account registration differs from promotion request")
+            from quant_pipeline.research_timing import POLICY
+
+            if frozen.get("execution_timing_policy") != (POLICY if require_timely_orders else None):
+                raise ValueError("Existing account timing policy differs from promotion request")
             if (
                 input_lineage(recipe["inputs"]) != frozen["input_lineage"]
                 or input_prefix(recipe["inputs"], frozen["initial_input_cutoff"])
@@ -149,6 +155,10 @@ def promote(
         "initial_input_prefix": input_prefix(recipe["inputs"], initial_cutoff),
         "input_lineage": input_lineage(recipe["inputs"]),
     }
+    if require_timely_orders:
+        from quant_pipeline.research_timing import POLICY
+
+        definition["execution_timing_policy"] = POLICY
     output.mkdir(parents=True, exist_ok=False)
     registry = TrialRegistry(output / "account.db")
     registry.register(account_id, definition, now=now)
@@ -420,6 +430,7 @@ def inspect_account(root: Path, *, now=None) -> dict:
         "window": {"start": spec["holdout_start"], "end": spec["holdout_end"]},
         "candidate": spec["parameters"][0]["name"],
         "source_scope": spec["source_scope"],
+        "execution_timing_policy": spec.get("execution_timing_policy", "unregistered"),
         "code_identity": spec["code_identity"],
         "attempts": list(attempts.values()),
         "observations": saved,
@@ -466,6 +477,7 @@ def observe(
 
     root = root.resolve()
     now = _now(now)
+    started = time.monotonic()
     date.fromisoformat(as_of)
     with study_lock(root):
         account = load_account(root)
@@ -560,6 +572,17 @@ def observe(
                 account_policy="continuous account replay from frozen start; no daily capital reset",
                 observed_at=now.isoformat(),
             )
+            if spec.get("execution_timing_policy"):
+                from quant_pipeline.research_timing import POLICY, verify
+
+                if spec["execution_timing_policy"] != POLICY:
+                    raise ValueError("Unsupported frozen execution timing policy")
+                committed = {
+                    str((root / e["payload"]["result"]).resolve().parent): e["recorded_at"]
+                    for e in history
+                    if e["status"] == "completed"
+                }
+                result["timing_evidence"] = verify(out, previous, committed)
             result["diagnostics"] = []
             maximum = spec["recipe"].get("risk", {}).get("max_drawdown")
             if maximum is not None and abs(result["metrics"].get("max_drawdown", 0)) >= maximum:
@@ -583,6 +606,9 @@ def observe(
             }
             if execution_gate is not None:
                 execution_gate("before_commit", evidence)
+            result["completed_at"] = (
+                now + timedelta(seconds=time.monotonic() - started)
+            ).isoformat()
             path = out / "result.json"
             path.write_text(canonical(result), encoding="utf-8")
             registry.finish(
@@ -690,6 +716,7 @@ def main():
     create.add_argument("--account-id", required=True)
     create.add_argument("--start", required=True)
     create.add_argument("--end", required=True)
+    create.add_argument("--require-timely-orders", action="store_true")
     update = sub.add_parser("observe")
     update.add_argument("account", type=Path)
     update.add_argument(
@@ -711,6 +738,7 @@ def main():
             account_id=args.account_id,
             start=args.start,
             end=args.end,
+            require_timely_orders=args.require_timely_orders,
         )
     elif args.command == "observe":
         value = observe(args.account, load_recipe(args.recipe)["inputs"], as_of=args.as_of)

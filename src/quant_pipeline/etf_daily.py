@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time as wallclock
 import uuid
 from copy import deepcopy
 from datetime import datetime, time, timezone
@@ -18,7 +19,7 @@ import pandas as pd
 import yaml
 from quant_lab.research import canonical, file_hash, load_recipe, study_lock
 
-from quant_pipeline import forward_daily, research_paper
+from quant_pipeline import etf_collection, etf_schedule, forward_daily, research_paper
 
 SYMBOLS = ["510300", "510500", "159915", "588000"]
 SLOTS = (time(16, 30), time(17), time(18))
@@ -31,10 +32,11 @@ def load_profile(path):
     required = {"schema", "dataset_root", "recipe", "output_root", "forward_config"}
     if (
         not isinstance(value, dict)
-        or set(value) not in (required, required | {"master_refresh"})
+        or not required <= set(value) <= required | {"master_refresh", "schedule"}
         or value["schema"] != SCHEMA
     ):
         raise ValueError("ETF daily profile keys do not match v1")
+    etf_schedule.validate(value.get("schedule"))
     for key in required - {"schema"}:
         if key == "forward_config" and value[key] is None:
             continue
@@ -186,6 +188,16 @@ def status(path, *, now=None):
             "Simulation positions and modeled costs, not broker executions",
             "Operational acceptance does not certify strategy effectiveness",
         ],
+        "schedule": etf_schedule.window(profile, now, trading, history, expected),
+        "preflight_passed_at": next(
+            (
+                s.get("recorded_at")
+                for r in reversed(history)
+                for s in reversed(r["stages"])
+                if s["stage"] == "preflight" and s["state"] == "completed"
+            ),
+            None,
+        ),
     }
     if profile["forward_config"]:
         config = forward_daily.load_config(profile["forward_config"])
@@ -253,7 +265,7 @@ def _stage_recipe(profile, manifest, directory):
 def run(path, *, mode="tick", now=None):
     """One bounded operation. Retries apply only to pre-observation acquisition failures."""
     from a_share_multifactor.research_workbench import preflight_recipe
-    from quant_data_kit.research_dataset import inspect_dataset, update_dataset
+    from quant_data_kit.research_dataset import inspect_dataset
     from quant_lab.research import digest
 
     if mode not in {"tick", "refresh", "observe"}:
@@ -263,6 +275,11 @@ def run(path, *, mode="tick", now=None):
     manifest, frames = _snapshot(profile)
     as_of, trading = closed_session(frames, now)
     local = now.astimezone(ZoneInfo("Asia/Shanghai"))
+    started = wallclock.monotonic()
+    configured = profile.get("schedule") is not None
+    initial_window = etf_schedule.window(profile, now, trading, [], as_of)
+    if configured and initial_window["state"] != "ready":
+        return {**initial_window, "read_only": True}
     if mode == "tick" and (not trading or local.time() < SLOTS[0]):
         return {"state": "not_due" if trading else "market_closed", "read_only": True}
     if mode == "tick" and not profile["forward_config"]:
@@ -276,9 +293,26 @@ def run(path, *, mode="tick", now=None):
     with study_lock(root):
         _identity_unchanged(profile)
         history = _current_history(profile)
-        slot = max((i for i, boundary in enumerate(SLOTS) if local.time() >= boundary), default=-1)
-        today = [r for r in history if r["as_of"] == as_of and r["mode"] == "tick"]
-        if mode == "tick" and today:
+        window = etf_schedule.window(profile, now, trading, history, as_of)
+        slot = window["slot"]
+        today = [r for r in history if r["as_of"] == as_of and (configured or r["mode"] == "tick")]
+        reuse_data = bool(configured and today and today[-1]["state"] == "research_ready")
+        if configured and today:
+            previous = today[-1]
+            if (
+                previous["state"] == "completed"
+                or mode != "observe"
+                and not (mode == "tick" and reuse_data)
+                and (previous["state"] != "collection_retryable" or slot <= previous["slot"])
+            ):
+                return {
+                    "state": "already_attempted",
+                    "read_only": True,
+                    "previous_state": previous["state"],
+                    "operation_id": previous["id"],
+                    "schedule": window,
+                }
+        elif mode == "tick" and today:
             previous = today[-1]
             if previous["state"] != "collection_retryable" or slot <= previous["slot"]:
                 return {
@@ -323,25 +357,30 @@ def run(path, *, mode="tick", now=None):
             research_paper.atomic_json(directory / "operation.json", operation)
 
         def stage(name, state, **evidence):
-            operation["stages"].append({"stage": name, "state": state, **evidence})
+            operation["stages"].append(
+                {
+                    "stage": name,
+                    "state": state,
+                    "recorded_at": datetime.now(timezone.utc).isoformat(),
+                    **evidence,
+                }
+            )
             publish()
 
         publish()
         try:
-            _identity_unchanged(profile)
-            if profile.get("master_refresh"):
-                from quant_data_kit.research_dataset import bind_instrument_master
-
-                from quant_pipeline.etf_master_refresh import refresh
-
-                stage("master_refresh", "running")
-                bundle, evidence = refresh(profile["master_refresh"], directory / "master-refresh")
-                _identity_unchanged(profile)
-                bind_instrument_master(profile["dataset_root"], bundle)
-                stage("master_refresh", "completed", evidence=evidence)
-            stage("collection", "running")
-            if mode != "observe":
-                update_dataset(profile["dataset_root"], end=as_of, overlap_sessions=5)
+            fetch = mode != "observe" and not reuse_data
+            if configured:
+                etf_collection.bounded(
+                    profile,
+                    directory,
+                    as_of,
+                    stage,
+                    timeout=window["collection_timeout_seconds"],
+                    fetch=fetch,
+                )
+            else:
+                etf_collection.collect(profile, directory, as_of, stage, fetch=fetch)
             manifest, _ = _snapshot(profile)
             quality = inspect_dataset(profile["dataset_root"], manifest["snapshot_id"])
             operation["data"] = {
@@ -366,6 +405,10 @@ def run(path, *, mode="tick", now=None):
                     reason="Provider has not published the target session",
                 )
                 return operation
+            if pd.Timestamp(market_capture(profile, manifest)) < (
+                pd.Timestamp(as_of, tz="Asia/Shanghai") + pd.Timedelta(hours=15)
+            ):
+                raise ValueError("Market snapshot was captured before the required close")
             stage("collection", "completed")
             recipe_path, recipe = _stage_recipe(profile, manifest, directory)
             operation["research_recipe"] = str(recipe_path)
@@ -384,6 +427,7 @@ def run(path, *, mode="tick", now=None):
             if not check["passed"]:
                 operation["state"] = "preflight_blocked"
                 return operation
+            operation["preflight_passed_at"] = datetime.now(timezone.utc).isoformat()
             _identity_unchanged(profile)
             if mode == "refresh" or not profile["forward_config"]:
                 operation["state"] = "research_ready" if mode == "refresh" else "candidate_required"
@@ -418,9 +462,14 @@ def run(path, *, mode="tick", now=None):
                 if file_hash(original.path) != original.sha256:
                     raise ValueError("Forward operator configuration changed")
 
-            receipt = forward_daily.run(forward_path, as_of, now=now, operation_gate=operator_gate)
+            execution_now = now + pd.Timedelta(seconds=wallclock.monotonic() - started)
+            receipt = forward_daily.run(
+                forward_path, as_of, now=execution_now, operation_gate=operator_gate
+            )
             stage("observe", receipt["state"], evidence=receipt)
             operation["state"] = receipt["state"]
+            if receipt["state"] != "completed":
+                operation["error"] = receipt.get("reason", "Native observation did not complete")
             if receipt["state"] == "completed":
                 operation["execution"] = execution_view(original.account)
                 stage("verify", "completed")
@@ -437,7 +486,9 @@ def run(path, *, mode="tick", now=None):
             )
             operation.update(
                 state="collection_retryable"
-                if collecting and (transport or _publication_delay(exc, as_of))
+                if (isinstance(exc, etf_collection.CollectionFailure) and exc.retryable)
+                or collecting
+                and (transport or _publication_delay(exc, as_of))
                 else "blocked",
                 error=str(exc),
                 error_type=type(exc).__name__,
@@ -449,6 +500,24 @@ def run(path, *, mode="tick", now=None):
             )
             return operation
         finally:
+            if configured and window["last_slot"] and operation["state"] == "collection_retryable":
+                operation["state"] = "collection_exhausted"
+            if configured:
+                operation["schedule"] = {
+                    **window,
+                    "next_attempt_at": next(
+                        (
+                            datetime.combine(
+                                local.date(), time.fromisoformat(s), local.tzinfo
+                            ).isoformat()
+                            for s in window["slots"]
+                            if time.fromisoformat(s) > local.time()
+                        ),
+                        None,
+                    )
+                    if operation["state"] == "collection_retryable"
+                    else None,
+                }
             operation["finished_at"] = datetime.now(timezone.utc).isoformat()
             previous = history[-1] if history else None
 

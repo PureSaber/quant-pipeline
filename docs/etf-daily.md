@@ -48,3 +48,29 @@ pins all installed repositories. Operate a single scheduler against `tick`; pres
 old paused accounts and obtain a recorded human candidate decision before activation.
 Registration uses actual time and a future calendar session. Five natural sessions
 are operational acceptance, not strategy validation.
+
+## Bounded evening collection and timely orders
+
+An optional `schedule` adds `timezone: Asia/Shanghai`, an ordered `slots` list
+(this deployment: `16:30`, `17:00`, `18:00`, `21:00`, `22:00`), and
+`collection_timeout_seconds: 600`. Profiles without it retain the legacy behavior.
+Configured profiles allow entry only within the collection budget after a slot;
+outside those windows all commands are read-only. Manual refresh and scheduled
+tick share slot receipts. A successful refresh can feed observation without
+another market fetch. Same-day completed observations are never repeated.
+
+Collection runs in a killable isolated Python worker. Timeout stops the worker
+and preserves partial evidence; only transport failures and missing final daily
+bars are retryable. The last-slot failure becomes `collection_exhausted`.
+Historical changes, corrupted artifacts and changed official evidence block.
+Status exposes the next retry, market capture and preflight completion times.
+
+Register new operational accounts with `research_paper promote
+--require-timely-orders`. This freezes `prior-observation-before-open/v1` in the
+account definition without changing strategy parameters or older accounts.
+Before publishing a new observation, native v2 orders/fills are validated. Every
+opening fill must match an immutable order in an earlier completed observation;
+both its completion timestamp and native registry commit must precede that
+session's 09:30 Shanghai opening. A late/missing witness or changed order rejects
+the observation and retains the last successful ledger. Recovery cannot invent
+orders for an opening that has already passed. Same-day reuse remains idempotent.
