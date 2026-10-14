@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --build-deps-for=editable --constraint=requirements-research.in --extra=dev --extra=research --index-url=https://pypi.org/simple --output-file=requirements-research.lock --strip-extras pyproject.toml
 #
-a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@cbe001ee09852d20a12ccc6af5118290fc79f835
+a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@3f0b3b2bf79c66b989d723e93f2f396e54b11881
     # via quant-pipeline (pyproject.toml)
 akshare @ https://raw.githubusercontent.com/PureSaber/a-share-multifactor/d5869c47815de17a7bc9836540c402dd55a8eb48/vendor/wheels/akshare-1.18.88.post1-py3-none-any.whl#sha256=de6d7f77008299b5c96e13559542e153ac58d0780523c0d5b45694ce97e2099f
     # via
@@ -298,7 +298,7 @@ quant-lab @ git+https://github.com/PureSaber/quant-lab.git@4c48f8a678c8d29a7dc46
     #   quant-agent
     #   quant-pipeline (pyproject.toml)
     #   quant-report-hub
-quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@6ac45f4cefe640e72d57e7d7dd33d0c3d83a6054
+quant-portfolio @ git+https://github.com/PureSaber/quant-portfolio.git@8db176e6f92210cc43e0c6043ac05e1f53ceb6d1
     # via a-share-multifactor
 quant-report-hub @ git+https://github.com/PureSaber/quant-report-hub.git@2b34ec37914b77e3be0458171716a2c0b4bcfa04
     # via quant-pipeline (pyproject.toml)
