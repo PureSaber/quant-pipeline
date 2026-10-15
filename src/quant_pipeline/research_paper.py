@@ -87,6 +87,55 @@ def promote(
             ):
                 raise ValueError("Existing account registration inputs changed")
             return publish_account(output, account_id, record)
+    definition = prepare_promotion(
+        study,
+        candidate_name,
+        account_id=account_id,
+        start=start,
+        end=end,
+        now=now,
+        require_timely_orders=require_timely_orders,
+    )
+    output.mkdir(parents=True, exist_ok=False)
+    registry = TrialRegistry(output / "account.db")
+    registry.register(account_id, definition, now=now)
+    return publish_account(output, account_id, registry.definition(account_id))
+
+
+def prepare_promotion(
+    study: Path,
+    candidate_name: str,
+    *,
+    account_id: str,
+    start: str,
+    end: str,
+    now=None,
+    require_timely_orders: bool = False,
+) -> dict:
+    """Validate a new promotion and return its frozen definition without writing."""
+    from quant_report_hub.research_workbench import load_study
+
+    from quant_pipeline.research_web import identifier
+
+    now = _now(now)
+    date.fromisoformat(start)
+    date.fromisoformat(end)
+    identifier(account_id)
+    summary = load_study(study)
+    recipe = deepcopy(summary["recipe"])
+    if recipe["backend"] != "equity":
+        raise ValueError("Forward accounts require the equity backend")
+    pd.Timestamp(start)
+    pd.Timestamp(end)
+    chosen = next((r for r in summary["results"] if r["candidate"]["name"] == candidate_name), None)
+    if any(row["status"] != "completed" for row in summary["results"]):
+        raise ValueError("Complete the entire preregistered candidate family before promotion")
+    if chosen is None or chosen["status"] != "completed":
+        raise ValueError("Promote a completed preregistered candidate")
+    if recipe.get("validation", {}).get("direction_policy") == "train_ic":
+        raise ValueError(
+            "Freeze explicit factor directions in a new study before forward promotion"
+        )
     if chosen["identity"] != equity_code_identity():
         raise ValueError("Source study code differs from current runtime")
     if input_identity(recipe) != chosen.get("data_identity"):
@@ -159,10 +208,7 @@ def promote(
         from quant_pipeline.research_timing import POLICY
 
         definition["execution_timing_policy"] = POLICY
-    output.mkdir(parents=True, exist_ok=False)
-    registry = TrialRegistry(output / "account.db")
-    registry.register(account_id, definition, now=now)
-    return publish_account(output, account_id, registry.definition(account_id))
+    return definition
 
 
 def publish_account(output: Path, account_id: str, record: dict) -> dict:
