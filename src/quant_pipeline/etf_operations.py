@@ -89,7 +89,7 @@ def invoke(argv, *, input, timeout, process_directory=None, **options):
 def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
+    temporary = path.with_name("." + uuid.uuid4().hex + ".tmp")
     temporary.write_text(
         json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8"
     )

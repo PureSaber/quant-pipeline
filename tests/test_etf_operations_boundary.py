@@ -161,6 +161,15 @@ def test_cli_exposes_no_clock_override(capsys, monkeypatch):
     assert "verification_failed" in capsys.readouterr().out
 
 
+def test_atomic_receipt_near_windows_path_limit(tmp_path):
+    # A long evidence hash must not be repeated in the temporary filename.
+    length = min(180, 245 - len(str(tmp_path)) - 1)
+    path = tmp_path / ("a" * (length - 5) + ".json")
+    ops.save(path, {"state": "interrupted", "history_preserved": True})
+    assert ops.read(path)["history_preserved"]
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def test_real_child_is_bounded_and_creation_identity_is_observable(tmp_path):
     options = {
         "stdout": subprocess.PIPE,
