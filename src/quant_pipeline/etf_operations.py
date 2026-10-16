@@ -332,6 +332,22 @@ def status(path, *, now=None, _lock_owned=False):
         latest=latest,
         last_success=next((r for r in reversed(rows) if r["state"] == "completed"), None),
     )
+    native["research_input"] = next(
+        (r for r in reversed(rows) if r.get("research_recipe")), native.get("research_input")
+    )
+    missed = (
+        [
+            s
+            for i, s in enumerate(schedule["slots"])
+            if now.astimezone(etf_schedule.ZONE)
+            >= datetime.fromisoformat(local_date + "T" + s + ":00+08:00")
+            + timedelta(seconds=profile["schedule"]["collection_timeout_seconds"])
+            and not any(r.get("slot") == i for r in today)
+        ]
+        if native["today_is_session"] and not complete
+        else []
+    )
+    schedule["missed_slots"] = missed
     native["schedule"] = {**schedule, "next_attempt_at": next_at}
     native["operations"] = {
         "schema": SCHEMA,
@@ -690,6 +706,18 @@ def main(argv=None):
                 else None
             )
             result = execute(args.config, trigger=args.trigger, recovery=plan)
+            if args.trigger == "windows_task":
+                config, _, _ = load(args.config)
+                save(
+                    Path(config["output_root"]) / "triggers" / (uuid.uuid4().hex + ".json"),
+                    {
+                        "schema": "quant.etf-trigger/v1",
+                        "checked_at": datetime.now(timezone.utc).isoformat(),
+                        "result": result,
+                        "natural_credit": False,
+                        "note": "Trigger evidence alone never counts as a successful session",
+                    },
+                )
         print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 0 if result.get("state") not in {"blocked", "failed", "collection_exhausted"} else 3
     except Exception as exc:  # noqa: BLE001 - CLI fail-closed boundary

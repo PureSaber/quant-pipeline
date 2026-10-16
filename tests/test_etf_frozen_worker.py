@@ -68,7 +68,7 @@ def test_worker_marks_actual_process_and_finishes_even_on_failure(native):
         {"action": "collect", "config": config, "directory": str(directory), "as_of": "2026-10-16"}
     )
     assert result["state"] == "collected"
-    marker = list(directory.glob("worker-*.json"))[0]
+    marker = next(iter(directory.glob("worker-*.json")))
     assert json.loads(marker.read_text())["state"] == "finished"
     with pytest.raises(ValueError, match="HISTORICAL_BACKFILL"):
         worker.execute_request(

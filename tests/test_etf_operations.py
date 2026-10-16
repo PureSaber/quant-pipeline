@@ -141,6 +141,31 @@ def test_disabled_continuation_cannot_write(harness):
     assert harness["calls"] == ["inspect"]
 
 
+def test_windows_trigger_records_skipped_window_without_credit(harness, capsys):
+    harness["now"] = harness["now"].replace(hour=8, minute=41)
+    assert ops.main(["tick", "--config", "config", "--trigger", "windows_task"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "waiting_for_slot"
+    records = list(Path(harness["config"]["output_root"]).glob("triggers/*.json"))
+    assert len(records) == 1 and not ops.read(records[0])["natural_credit"]
+    assert ops.status("config")["schedule"]["missed_slots"] == ["16:30"]
+    assert "collect" not in harness["calls"]
+
+
+def test_cli_preview_does_not_execute_and_requires_revalidation(harness, tmp_path, capsys):
+    harness["collect"] = {"state": "failed", "exceptions": [{"type": "TimeoutError"}]}
+    original = ops.execute("config")
+    harness["now"] += timedelta(minutes=30)
+    assert ops.main(["recover-plan", "--config", "config", "--operation", original["id"]]) == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert harness["calls"].count("collect") == 1
+    plan_path = tmp_path / "preview.json"
+    ops.save(plan_path, preview)
+    harness["native"]["data"]["snapshot_id"] = "changed"
+    assert ops.main(["recover-execute", "--config", "config", "--plan", str(plan_path)]) == 3
+    assert "State changed" in capsys.readouterr().out
+    assert harness["calls"].count("collect") == 1
+
+
 @pytest.mark.parametrize(
     "hour,minute,trading,expected",
     [
