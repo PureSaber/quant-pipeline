@@ -10,7 +10,7 @@ except ModuleNotFoundError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_COMMIT = "a3752c0eda7dc747bce0c4d0686aaec80c2abdf7"
+WORKSPACE_COMMIT = "2cb59b1c433a154335f13d5fd9f65d3aee974596"
 
 
 def test_release_and_workspace_governance_are_declared() -> None:
