@@ -109,7 +109,7 @@ def harness(tmp_path, monkeypatch):
         config=config,
         profile=profile,
         native=native,
-        scheduler={"verified": True, "enabled": True, "state": "Running"},
+        scheduler={"verified": True, "enabled": True, "state": "Running", "natural_trigger": True},
     )
 
     def worker(config, action, **kwargs):
@@ -204,6 +204,12 @@ def test_manual_success_never_gets_natural_credit(harness):
     assert ops.status("config")["operations"]["acceptance"]["longest_consecutive"] == 0
 
 
+def test_unproven_scheduler_trigger_cannot_earn_natural_credit(harness):
+    harness["scheduler"]["natural_trigger"] = False
+    result = ops.execute("config", trigger="windows_task")
+    assert result["state"] == "completed" and not result["natural_credit"]
+
+
 def test_tls_retry_later_slot_only_and_final_exhaustion(harness):
     harness["collect"] = {
         "state": "failed",
@@ -294,7 +300,7 @@ def test_acceptance_preserves_gaps_and_excludes_manual(harness):
             "state": "completed",
             "sha256": str(day),
             "trigger": "windows_task",
-            "scheduler": {"verified": True},
+            "scheduler": {"verified": True, "natural_trigger": True},
             "verified_at": "now",
             "natural_credit": True,
         }

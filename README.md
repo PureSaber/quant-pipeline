@@ -153,7 +153,7 @@ closed.
 The v2 implementation accepts only a canonical, self-hashed, release-ready `StackManifest 1.0.0`
 produced by the backward-compatible Workspace manifest contract. The operations layer
 requires the Windows scheduler and common maintenance admission lock from pinned commit
-`e0ac104ecad9e6d51fa95f0f469b191bf58e8403`. File inputs must use canonical JSON;
+`a3752c0eda7dc747bce0c4d0686aaec80c2abdf7`. File inputs must use canonical JSON;
 both files and mappings are validated by `quant-workspace`. The integration is a required runtime
 dependency and is pinned in `requirements.lock`.
 

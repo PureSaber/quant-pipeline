@@ -390,6 +390,7 @@ def acceptance(native, rows):
         if r["state"] == "completed"
         and r.get("trigger") == "windows_task"
         and r.get("scheduler", {}).get("verified") is True
+        and r.get("scheduler", {}).get("natural_trigger") is True
         and r.get("verified_at")
         and r.get("natural_credit") is True
     }
@@ -673,7 +674,11 @@ def _execute_locked(path, config, profile, config_sha, trigger, recovery):
         stage("observe", "completed")
         stage("verify", "completed")
         operation["verified_at"] = datetime.now(timezone.utc).isoformat()
-        operation["natural_credit"] = trigger == "windows_task" and recovery is None
+        operation["natural_credit"] = (
+            trigger == "windows_task"
+            and recovery is None
+            and ops["scheduler"].get("natural_trigger") is True
+        )
         return operation
     except Exception as exc:  # noqa: BLE001 - preserve a failed attempt without faking completion
         operation.update(state="blocked", error=str(exc), reason_code="native_check_failed")

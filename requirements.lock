@@ -89,7 +89,7 @@ quant-factors @ git+https://github.com/PureSaber/quant-factors.git@1c798bc737bc9
     # via quant-pipeline (pyproject.toml)
 quant-lab @ git+https://github.com/PureSaber/quant-lab.git@4c48f8a678c8d29a7dc46294c99f0e668cd6c52b
     # via quant-pipeline (pyproject.toml)
-quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@e0ac104ecad9e6d51fa95f0f469b191bf58e8403
+quant-workspace @ git+https://github.com/PureSaber/quant-workspace.git@a3752c0eda7dc747bce0c4d0686aaec80c2abdf7
     # via quant-pipeline (pyproject.toml)
 referencing==0.37.0
     # via
