@@ -674,10 +674,16 @@ def _execute_locked(path, config, profile, config_sha, trigger, recovery):
         stage("observe", "completed")
         stage("verify", "completed")
         operation["verified_at"] = datetime.now(timezone.utc).isoformat()
+        native_receipt = result.get("native_receipt") or {}
         operation["natural_credit"] = (
             trigger == "windows_task"
             and recovery is None
             and ops["scheduler"].get("natural_trigger") is True
+            # Native run returns completed for a verified pre-existing observation too.
+            # Only a fresh execution receipt proves this trigger performed the observation.
+            and native_receipt.get("plan_state") == "ready"
+            and bool(native_receipt.get("native_attempt_id"))
+            and bool(native_receipt.get("native_result_sha256"))
         )
         return operation
     except Exception as exc:  # noqa: BLE001 - preserve a failed attempt without faking completion

@@ -53,7 +53,11 @@ JSON alongside the explicit interrupted resolution. Failed attempts remain inspe
 
 Only a verified running Windows task with an in-window original operation, completed
 native observation and ledger verification can receive natural-session credit.
-Manual execution and recovery receive none. Acceptance derives consecutive sessions
+Manual execution and recovery receive none. A session receives natural credit
+only when the native receipt proves a fresh ready-to-execute observation, including
+its native attempt ID and result digest. A completed ledger that predates the scheduled
+call can be reconciled but earns no natural-session credit.
+Acceptance derives consecutive sessions
 from the current configuration/worker version's receipts; gaps and previous versions
 remain visible. Six consecutive trading days are an operations milestone, never proof
 of strategy effectiveness. Legacy acceptance records are not rewritten.

@@ -74,7 +74,15 @@ def harness(tmp_path, monkeypatch):
             "forward_config_sha256": "a" * 64,
             "forward_config": "staged",
         },
-        "execute": {"state": "completed", "execution": {"available": True, "as_of": "2026-10-16"}},
+        "execute": {
+            "state": "completed",
+            "execution": {"available": True, "as_of": "2026-10-16"},
+            "native_receipt": {
+                "plan_state": "ready",
+                "native_attempt_id": "native-attempt",
+                "native_result_sha256": "b" * 64,
+            },
+        },
         "assess": {"state": "interrupted"},
     }
     config = {
@@ -188,6 +196,25 @@ def test_natural_success_requires_task_and_native_ledger(harness):
     harness["native"]["execution"] = harness["execute"]["execution"]
     assert ops.status("config")["operations"]["state"] == "completed"
     assert ops.execute("config")["state"] == "already_attempted"
+    assert harness["calls"].count("execute") == 1
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        {"plan_state": "completed", "state": "completed", "outcome": "success"},
+        {"plan_state": "ready", "state": "completed", "outcome": "success"},
+        None,
+    ],
+)
+def test_existing_or_unproven_native_success_never_gets_natural_credit(harness, receipt):
+    # A verified ledger can predate this scheduled call (for example a legacy manual run).
+    # Re-associating it is useful, but cannot prove that automation performed the observation.
+    harness["execute"]["native_receipt"] = receipt
+    result = ops.execute("config", trigger="windows_task")
+    assert result["state"] == "completed"
+    assert result["natural_credit"] is False
+    assert ops.status("config")["operations"]["acceptance"]["longest_consecutive"] == 0
     assert harness["calls"].count("execute") == 1
 
 
