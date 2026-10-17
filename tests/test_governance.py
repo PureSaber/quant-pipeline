@@ -10,7 +10,7 @@ except ModuleNotFoundError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_COMMIT = "537388a4d9548b612fa1e4b306c482c04b45c433"
+WORKSPACE_COMMIT = "2cb59b1c433a154335f13d5fd9f65d3aee974596"
 
 
 def test_release_and_workspace_governance_are_declared() -> None:
@@ -25,7 +25,7 @@ def test_release_and_workspace_governance_are_declared() -> None:
         "lock-files": ["requirements.lock"],
     }
     dependencies = "\n".join(project["dependencies"])
-    assert "quant-workspace.git@v0.3.1" in dependencies
+    assert "quant-workspace.git@" + WORKSPACE_COMMIT in dependencies
     assert not re.search(r"git\+[^\s]+@(main|master|latest)(?:\b|$)", dependencies)
 
 
@@ -34,7 +34,7 @@ def test_lock_closes_python310_and_editable_build_dependencies() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "pip-compile with Python 3.10" in lock
-    assert "quant-workspace.git@v0.3.1" in lock
+    assert "quant-workspace.git@" + WORKSPACE_COMMIT in lock
     assert WORKSPACE_COMMIT in readme
     assert re.search(r'tomli==[^\s]+ ; python_version < "3\.11"', lock)
     assert "exceptiongroup==" in lock

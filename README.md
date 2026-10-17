@@ -151,9 +151,9 @@ event or replacement checkpoint is written. Missing or modified inputs, outputs,
 closed.
 
 The v2 implementation accepts only a canonical, self-hashed, release-ready `StackManifest 1.0.0`
-produced by the published `quant-workspace v0.3.1` contract. The dependency uses the immutable
-annotated tag `v0.3.1`, which peels to commit
-`537388a4d9548b612fa1e4b306c482c04b45c433`. File inputs must use canonical JSON;
+produced by the backward-compatible Workspace manifest contract. The operations layer
+requires the Windows scheduler and common maintenance admission lock from pinned commit
+`2cb59b1c433a154335f13d5fd9f65d3aee974596`. File inputs must use canonical JSON;
 both files and mappings are validated by `quant-workspace`. The integration is a required runtime
 dependency and is pinned in `requirements.lock`.
 
