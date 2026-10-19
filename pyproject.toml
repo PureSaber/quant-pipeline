@@ -30,7 +30,7 @@ dev = [
     "wheel>=0.46",
     "pytest>=9.0,<10",
     "pytest-cov>=7.0,<8",
-    "ruff>=0.16,<0.17",
+    "ruff>=0.16,<0.18",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
