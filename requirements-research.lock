@@ -185,7 +185,7 @@ orjson==3.12.0
     #   quant-data-kit
 ormsgpack==1.12.2
     # via langgraph-checkpoint
-osqp==1.0.5
+osqp==1.1.3
     # via
     #   cvxpy
     #   quant-portfolio
