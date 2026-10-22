@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     listing = commands.add_parser("list")
     listing.add_argument("--status")
     listing.add_argument("--limit", type=int, default=100)
+    listing.add_argument("--before", help="continue before this job id in saved-time order")
     batch_submit = commands.add_parser("batch-submit")
     batch_submit.add_argument("--request", required=True, type=Path)
     batch_submit.add_argument("--key", required=True)
@@ -29,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         commands.add_parser(action).add_argument("batch_id")
     batch_list = commands.add_parser("batch-list")
     batch_list.add_argument("--limit", type=int, default=100)
+    batch_list.add_argument("--before", help="continue before this batch id in saved-time order")
     batch_list.add_argument("--project-id")
     retry = commands.add_parser("batch-retry")
     retry.add_argument("batch_id")
@@ -41,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         result = {
             "schema_version": "quant.durable-capabilities/v1",
             "batch_request": "quant.job-batch/v1",
+            "history_pagination": "cursor/v1",
         }
     elif args.command.startswith("batch-"):
         from .durable_batches import BatchStore
@@ -55,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = batches.submit(request, args.key)
         elif args.command == "batch-list":
-            result = batches.list(limit=args.limit, project_id=args.project_id)
+            result = batches.list(limit=args.limit, project_id=args.project_id, before=args.before)
         elif args.command == "batch-retry":
             if args.research:
                 from .durable_research import retry_research_batch
@@ -74,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             result = store.submit(request, args.key)
     elif args.command == "list":
-        result = store.list(status=args.status, limit=args.limit)
+        result = store.list(status=args.status, limit=args.limit, before=args.before)
     else:
         result = getattr(store, args.command)(args.job_id)
     print(canonical(result))

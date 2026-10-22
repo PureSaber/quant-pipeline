@@ -192,16 +192,29 @@ class JobStore:
         finally:
             db.close()
 
-    def list(self, *, limit: int = 100, status: str | None = None) -> list[dict]:
+    def list(
+        self, *, limit: int = 100, status: str | None = None, before: str | None = None
+    ) -> list[dict]:
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise JobError("limit must be in [1,1000]")
         db = self._connect()
         try:
             query = "SELECT * FROM jobs"
             args: list = []
+            conditions = []
             if status is not None:
-                query += " WHERE status=?"
+                conditions.append("status=?")
                 args.append(status)
+            if before is not None:
+                cursor = db.execute(
+                    "SELECT created_at,job_id FROM jobs WHERE job_id=?", (before,)
+                ).fetchone()
+                if cursor is None:
+                    raise JobError("history cursor does not exist")
+                conditions.append("(created_at,job_id) < (?,?)")
+                args.extend(cursor)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
             query += " ORDER BY created_at DESC, job_id DESC LIMIT ?"
             return [self._job(row) for row in db.execute(query, (*args, limit))]
         finally:
