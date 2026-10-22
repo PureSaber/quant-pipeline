@@ -507,7 +507,7 @@ def test_missing_config_invalid_date_and_naive_clock_are_explicit(tmp_path, monk
         forward_daily.assess(
             config,
             "2023-06-01",
-            now=datetime(2023, 6, 1, 10),  # noqa: DTZ001 - deliberately invalid clock
+            now=datetime(2023, 6, 1, 10),  # Deliberately invalid clock.
         )
 
 
