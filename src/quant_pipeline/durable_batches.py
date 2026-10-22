@@ -155,13 +155,23 @@ class BatchStore:
         with self._read() as db:
             return self._get(db, batch_id)
 
-    def list(self, *, limit: int = 100, project_id: str | None = None) -> list[dict]:
+    def list(
+        self, *, limit: int = 100, project_id: str | None = None, before: str | None = None
+    ) -> list[dict]:
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise JobError("limit must be in [1,1000]")
         with self._read() as db:
-            rows = db.execute(
-                "SELECT batch_id,request FROM research_batches ORDER BY created_at DESC,batch_id DESC"
-            )
+            query = "SELECT batch_id,request FROM research_batches"
+            args = ()
+            if before is not None:
+                cursor = db.execute(
+                    "SELECT created_at,batch_id FROM research_batches WHERE batch_id=?", (before,)
+                ).fetchone()
+                if cursor is None:
+                    raise JobError("history cursor does not exist")
+                query += " WHERE (created_at,batch_id) < (?,?)"
+                args = tuple(cursor)
+            rows = db.execute(query + " ORDER BY created_at DESC,batch_id DESC", args)
             selected = []
             for row in rows:
                 if project_id is None or json.loads(row["request"])["project_id"] == project_id:
