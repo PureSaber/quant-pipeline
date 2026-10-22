@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+from quant_data_kit.failure_policy import EvidenceFault
 from quant_lab.research import file_hash
 
 
@@ -54,17 +55,17 @@ def refresh(config_path, directory):
 
     config_path, directory = Path(config_path), Path(directory)
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    if (
-        set(config) != {"schema", "source", "source_sha256", "guards"}
-        or config["schema"] != "quant.etf-master-refresh/v1"
-    ):
+    if set(config) != {"schema", "source", "source_sha256", "guards"} or config["schema"] not in {
+        "quant.etf-master-refresh/v1",
+        "quant.etf-master-refresh/v2",
+    }:
         raise ValueError("Master refresh configuration does not match v1")
     source = Path(config["source"])
     if (
         not source.is_absolute()
         or file_hash(source / "declaration.json") != config["source_sha256"]
     ):
-        raise ValueError("Reviewed master source identity changed")
+        raise EvidenceFault("identity_changed", "Reviewed master source identity changed")
     guards = config["guards"]
     if not isinstance(guards, list) or len(guards) < 2:
         raise ValueError("Current exchange rule-directory guards are required")
@@ -72,13 +73,33 @@ def refresh(config_path, directory):
     declaration = json.loads((source / "declaration.json").read_text(encoding="utf-8"))
     evidence = []
     for index, guard in enumerate(guards):
-        if set(guard) != {"url", "form", "sha256"}:
+        allowed = {"url", "form", "sha256"}
+        if config["schema"] == "quant.etf-master-refresh/v2" and "template_review" in guard:
+            allowed.add("template_review")
+        if set(guard) != allowed:
             raise ValueError("Invalid official rule-directory guard")
         content = fetch(guard["url"], form=guard["form"])
         digest = hashlib.sha256(content).hexdigest()
         (directory / f"guard-{index}.bin").write_bytes(content)
         if digest != guard["sha256"]:
-            raise ValueError("Official rule directory changed; review before extending evidence")
+            review = guard.get("template_review")
+            if not review or review.get("original_sha256") != guard["sha256"]:
+                raise EvidenceFault(
+                    "unparsed", "Official rule directory changed; review before extending evidence"
+                )
+            from quant_pipeline.rule_page_review import reviewed_template_change
+
+            try:
+                assessment = reviewed_template_change(content, review, root=config_path.parent)
+            except ValueError as exc:
+                raise EvidenceFault("unparsed", str(exc)) from exc
+            from quant_data_kit.failure_policy import assess_fault
+
+            assessment["failure_assessment"] = assess_fault(
+                "template_changed", template_reviewed=True
+            )
+            evidence.append({"url": guard["url"], **assessment})
+            continue
         evidence.append({"url": guard["url"], "sha256": digest})
     copied = directory / "source"
     copied.mkdir()
@@ -89,11 +110,13 @@ def refresh(config_path, directory):
         if copied.resolve() not in target.parents or source.resolve() not in original.parents:
             raise ValueError("Master attachment escapes source directory")
         if file_hash(original) != document["sha256"]:
-            raise ValueError("Reviewed master attachment changed")
+            raise EvidenceFault("identity_changed", "Reviewed master attachment changed")
         content = fetch(document["source_uri"])
         digest = hashlib.sha256(content).hexdigest()
         if digest != document["sha256"]:
-            raise ValueError("Official master attachment changed; new typed assertions required")
+            raise EvidenceFault(
+                "rule_changed", "Official master attachment changed; new typed assertions required"
+            )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
         evidence.append({"url": document["source_uri"], "sha256": digest})
@@ -107,7 +130,7 @@ def refresh(config_path, directory):
         source.resolve() not in catalog_path.parents
         or file_hash(catalog_path) != declaration["catalog_sha256"]
     ):
-        raise ValueError("Reviewed catalog changed")
+        raise EvidenceFault("identity_changed", "Reviewed catalog changed")
     catalog = pd.read_csv(catalog_path, dtype=str, keep_default_na=False)
     current = pd.to_datetime(catalog.effective_to, utc=True, format="mixed").eq(
         pd.Timestamp(previous_capture)
