@@ -525,7 +525,7 @@ def test_naive_clock_and_invalid_seed_fail_closed(tmp_path: Path) -> None:
     runner = DagRunner(
         stack_manifest=STACK_MANIFEST,
         seed=1,
-        clock=lambda: datetime(2026, 8, 29),  # noqa: DTZ001 - intentionally invalid fixture
+        clock=lambda: datetime(2026, 8, 29),  # Intentionally invalid fixture.
     )
     with pytest.raises(CheckpointError, match="timezone-aware"):
         runner.run(spec, "clock")
