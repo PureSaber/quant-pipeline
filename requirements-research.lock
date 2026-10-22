@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --build-deps-for=editable --constraint=requirements-research.in --extra=dev --extra=research --index-url=https://pypi.org/simple --output-file=requirements-research.lock --strip-extras pyproject.toml
 #
-a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@1083f57aff3c12501d7b9718c055ae7eb53cc609
+a-share-multifactor @ git+https://github.com/PureSaber/a-share-multifactor.git@456240d1b034f4b8997a79eeb19d7178d6e1018f
     # via quant-pipeline (pyproject.toml)
 akshare @ https://raw.githubusercontent.com/PureSaber/a-share-multifactor/d5869c47815de17a7bc9836540c402dd55a8eb48/vendor/wheels/akshare-1.18.88.post1-py3-none-any.whl#sha256=de6d7f77008299b5c96e13559542e153ac58d0780523c0d5b45694ce97e2099f
     # via

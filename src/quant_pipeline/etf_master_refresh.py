@@ -93,6 +93,11 @@ def refresh(config_path, directory):
                 assessment = reviewed_template_change(content, review, root=config_path.parent)
             except ValueError as exc:
                 raise EvidenceFault("unparsed", str(exc)) from exc
+            from quant_data_kit.failure_policy import assess_fault
+
+            assessment["failure_assessment"] = assess_fault(
+                "template_changed", template_reviewed=True
+            )
             evidence.append({"url": guard["url"], **assessment})
             continue
         evidence.append({"url": guard["url"], "sha256": digest})

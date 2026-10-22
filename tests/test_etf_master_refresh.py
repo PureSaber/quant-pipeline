@@ -100,3 +100,46 @@ def test_changed_official_evidence_never_publishes_bundle(tmp_path, monkeypatch,
 def test_refuses_nonofficial_transport_before_request():
     with pytest.raises(ValueError, match="official HTTPS"):
         refresh.fetch("http://www.sse.com.cn/rules")
+
+
+def test_v2_warning_keeps_attachment_change_blocked(tmp_path, monkeypatch):
+    import hashlib
+
+    from quant_data_kit.failure_policy import EvidenceFault
+
+    config, source, imported = setup_source(tmp_path, monkeypatch)
+    old = b'<script src="ui-v1.js"></script><a href="rule.pdf">rules</a>'
+    new = old.replace(b"ui-v1.js", b"ui-v2.js")
+    (tmp_path / "original.html").write_bytes(old)
+    sha = lambda b: hashlib.sha256(b).hexdigest()
+    review = {
+        "original_file": "original.html",
+        "original_sha256": sha(old),
+        "expected_sha256": sha(new),
+        "replacements": [{"before": "ui-v1.js", "after": "ui-v2.js"}],
+        "reviewed_at": "2025-02-01T00:00:00Z",
+        "reason": "fixture reviewed complete static directory",
+        "content_scope": "complete-static-rule-directory",
+    }
+    cfg = json.loads(config.read_text())
+    cfg["schema"] = "quant.etf-master-refresh/v2"
+    for guard in cfg["guards"]:
+        guard.update(sha256=sha(old), template_review=review)
+    config.write_text(json.dumps(cfg))
+    monkeypatch.setattr(
+        refresh,
+        "fetch",
+        lambda url, **kwargs: (
+            new if url.endswith("rules") else (source / "official.txt").read_bytes()
+        ),
+    )
+    _, receipt = refresh.refresh(config, tmp_path / "success")
+    warning = receipt["evidence"][0]["failure_assessment"]
+    assert warning["tier"] == "warning" and warning["gate_a_credit"] is False
+    monkeypatch.setattr(
+        refresh, "fetch", lambda url, **kwargs: new if url.endswith("rules") else b"new attachment"
+    )
+    with pytest.raises(EvidenceFault) as caught:
+        refresh.refresh(config, tmp_path / "changed")
+    assert caught.value.failure_assessment["kind"] == "rule_changed"
+    assert not (tmp_path / "changed/bundle").exists() and len(imported) == 1
